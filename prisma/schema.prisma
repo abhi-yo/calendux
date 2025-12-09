@@ -1,0 +1,182 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id // Clerk ID
+  email       String   @unique
+  name        String?
+  timezone    String   @default("UTC")
+  preferences Json?    // User preferences (working hours, etc)
+  energyProfile Json?  // User's typical energy patterns per hour
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  events      Event[]
+  causes      Cause[]
+  
+  // Subscription
+  tier        Tier     @default(FREE)
+  subscriptionStatus String? // "active", "canceled", "past_due"
+}
+
+enum Tier {
+  FREE
+  PRO
+  TEAM
+}
+
+enum EventType {
+  MEETING
+  TASK
+  HABIT
+  FOCUS
+  BREAK
+  PERSONAL
+}
+
+enum EventSource {
+  MANUAL
+  GOOGLE
+  NOTION
+  TODOIST
+  SLACK
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  
+  // Core Data
+  title       String
+  description String?
+  start       DateTime
+  end         DateTime
+  allDay      Boolean   @default(false)
+  location    String?
+  source      EventSource @default(MANUAL)
+  externalId  String?   // ID from the external system (e.g., Google Calendar ID)
+  
+  // Intelligent Calendar Fields
+  type        EventType @default(TASK)
+  energyCost  Int       @default(3) // 1-5 scale (Physical/Mental combined for MVP v1, split later)
+  cognitiveLoad Int     @default(3) // 1-5 scale
+  importance  Int       @default(3) // 1-5 scale
+  flexibility Int       @default(3) // 1-5 scale (1=fixed, 5=very flexible)
+  contextTag  String?   // e.g., "Deep Work", "Admin", "Social"
+  
+  // Recurrence
+  isRecurring Boolean   @default(false)
+  recurrenceRule String? // RRULE format
+  recurrenceParentId String?
+  recurrenceParent Event? @relation("RecurrenceGroup", fields: [recurrenceParentId], references: [id])
+  recurrenceChildren Event[] @relation("RecurrenceGroup")
+  
+  // Causal Relationships (Legacy direct link, keeping for simple parent/child)
+  causedById  String?
+  causedBy    Event?    @relation("CausalChain", fields: [causedById], references: [id])
+  causes      Event[]   @relation("CausalChain")
+  
+  // Graph Edges (Hyper-Context)
+  causedByEdges EventCause[] // Links to abstract Causes
+  outgoingRelations EventRelation[] @relation("SourceEvent")
+  incomingRelations EventRelation[] @relation("TargetEvent")
+  
+  // Predictions
+  predictions Prediction[]
+
+  // Context
+  tags        String[]
+  notes       String?
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, start])
+  @@index([causedById])
+}
+
+// Abstract Causes (e.g., "Project X Deadline", "Q4 Goals")
+model Cause {
+  id          String   @id @default(cuid())
+  description String
+  importance  Int      @default(3)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  events      EventCause[]
+  
+  createdAt   DateTime @default(now())
+}
+
+// Edge: Cause -> Event
+model EventCause {
+  id          String   @id @default(cuid())
+  
+  causeId     String
+  cause       Cause    @relation(fields: [causeId], references: [id], onDelete: Cascade)
+  
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  confidence  Float    @default(1.0)
+  relationType String  @default("GENERATED_BY") // e.g. "DEADLINE", "DEPENDENCY"
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([causeId, eventId])
+}
+
+// Edge: Event -> Event (The Causal Graph)
+model EventRelation {
+  id          String   @id @default(cuid())
+  
+  fromEventId String
+  fromEvent   Event    @relation("SourceEvent", fields: [fromEventId], references: [id], onDelete: Cascade)
+  
+  toEventId   String
+  toEvent     Event    @relation("TargetEvent", fields: [toEventId], references: [id], onDelete: Cascade)
+  
+  type        String   // "FOLLOWED_BY", "GENERATED_BY", "CONTEXT_SWITCH"
+  weight      Float    @default(1.0)
+  
+  createdAt   DateTime @default(now())
+
+  @@index([fromEventId])
+  @@index([toEventId])
+}
+
+enum PredictionType {
+  BURNOUT
+  CONFLICT
+  OVERLOAD
+}
+
+// AI Predictions/Warnings
+model Prediction {
+  id          String   @id @default(cuid())
+  
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  type        PredictionType
+  predictedDate DateTime
+  confidence  Float
+  details     Json?    // Structured reasoning
+  
+  createdAt   DateTime @default(now())
+}
