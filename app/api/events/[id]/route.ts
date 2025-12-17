@@ -45,7 +45,20 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { title, description, start, end, allDay } = body
+    const { 
+      title, 
+      description, 
+      start, 
+      end, 
+      allDay,
+      type,
+      energyCost,
+      importance,
+      flexibility,
+      causedById,
+      tags,
+      notes,
+    } = body
 
     // Ensure the event belongs to the user
     const existingEvent = await prisma.event.findFirst({
@@ -64,6 +77,13 @@ export async function PUT(
         ...(start && { start: new Date(start) }),
         ...(end && { end: new Date(end) }),
         ...(allDay !== undefined && { allDay }),
+        ...(type && { type }),
+        ...(energyCost && { energyCost }),
+        ...(importance && { importance }),
+        ...(flexibility && { flexibility }),
+        ...(causedById !== undefined && { causedById }),
+        ...(tags && { tags }),
+        ...(notes !== undefined && { notes }),
       },
     })
 
