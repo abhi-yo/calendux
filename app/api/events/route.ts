@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@clerk/nextjs/server"
 import { prisma } from "@/lib/db"
 
+export const dynamic = 'force-dynamic'
+
 // GET all events for the current user
 export async function GET(request: Request) {
   try {
