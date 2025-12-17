@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogClose,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
@@ -20,6 +21,7 @@ export function UpgradeDialog({ open, onOpenChange, feature }: UpgradeDialogProp
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className="max-w-4xl p-0 gap-0 overflow-hidden bg-white dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+        <DialogTitle className="sr-only">Upgrade to Pro</DialogTitle>
         <div className="grid md:grid-cols-5 h-[600px] md:h-[550px]">
           
           {/* Left: Brand / Value (Darker contrast side) */}
