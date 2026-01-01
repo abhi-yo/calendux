@@ -6,22 +6,26 @@ import { Event } from "@/lib/intelligence"
 
 export async function POST(req: Request) {
   const { userId } = await auth()
-  
+
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   try {
-    // 1. Fetch user events for next 7 days
-    const now = new Date()
-    const nextWeek = new Date(now)
-    nextWeek.setDate(nextWeek.getDate() + 7)
+    const body = await req.json()
+    const weekStartStr = body.weekStart
+
+    // 1. Fetch user events for the requested week
+    // If no weekStart provided, default to "now" (legacy behavior protection)
+    const startDate = weekStartStr ? new Date(weekStartStr) : new Date()
+    const endDate = new Date(startDate)
+    endDate.setDate(endDate.getDate() + 7)
 
     const events = await prisma.event.findMany({
-        where: {
-            userId,
-            start: { gte: now, lte: nextWeek }
-        }
+      where: {
+        userId,
+        start: { gte: startDate, lt: endDate }
+      }
     }) as unknown as Event[]
 
     if (events.length === 0) {
@@ -39,10 +43,10 @@ export async function POST(req: Request) {
     if (result.changes.length > 0) {
       for (const optimizedEvent of result.optimizedEvents) {
         const originalEvent = events.find(e => e.id === optimizedEvent.id)
-        
+
         // Check if this event was actually moved
-        if (originalEvent && 
-            (new Date(originalEvent.start).getTime() !== new Date(optimizedEvent.start).getTime())) {
+        if (originalEvent &&
+          (new Date(originalEvent.start).getTime() !== new Date(optimizedEvent.start).getTime())) {
           await prisma.event.update({
             where: { id: optimizedEvent.id },
             data: {
