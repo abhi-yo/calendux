@@ -10,16 +10,16 @@ import { InsightsPanel } from "@/components/InsightsPanel"
 import { UserButton } from "@clerk/nextjs"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
-import { UpgradeDialog } from "./UpgradeDialog"
-import { 
-  DndContext, 
-  DragEndEvent, 
-  useDraggable, 
-  useDroppable, 
-  useSensors, 
-  useSensor, 
-  MouseSensor, 
-  TouchSensor 
+
+import {
+  DndContext,
+  DragEndEvent,
+  useDraggable,
+  useDroppable,
+  useSensors,
+  useSensor,
+  MouseSensor,
+  TouchSensor
 } from "@dnd-kit/core"
 
 // Event type matching API response
@@ -122,8 +122,7 @@ export function WeeklyCalendar() {
   const [editingEvent, setEditingEvent] = React.useState<any>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [optimizing, setOptimizing] = React.useState(false)
-  const [showUpgradeDialog, setShowUpgradeDialog] = React.useState(false)
-  const [upgradeFeature, setUpgradeFeature] = React.useState("")
+
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
@@ -136,7 +135,7 @@ export function WeeklyCalendar() {
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250, 
+        delay: 250,
         tolerance: 5,
       },
     })
@@ -186,19 +185,25 @@ export function WeeklyCalendar() {
   const prevWeek = () => setCurrentDate(addDays(currentDate, -7))
   const today = () => setCurrentDate(new Date())
 
-  const isFreeTier = true 
-
   const handleOptimize = async () => {
-    if (isFreeTier) {
-      setUpgradeFeature("AI Rewrite Engine")
-      setShowUpgradeDialog(true)
-      return
-    }
     setOptimizing(true)
     try {
-      const res = await fetch("/api/optimize/ai", { method: "POST" })
+      const res = await fetch("/api/optimize/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekStart: weekStart.toISOString() })
+      })
       if (res.ok) {
-        toast.success("Schedule optimized!")
+        const data = await res.json()
+        if (data.changes && data.changes.length > 0) {
+          toast.success("Schedule optimized!", {
+            description: data.explanation
+          })
+        } else {
+          toast.info("No changes made", {
+            description: data.explanation || "Your schedule is already balanced."
+          })
+        }
         await fetchEvents()
         await fetchInsights()
       } else {
@@ -293,7 +298,7 @@ export function WeeklyCalendar() {
   }
 
   const getDayStatus = (day: Date) => {
-    const dayLoad = insights?.dailyLoads.find(d => 
+    const dayLoad = insights?.dailyLoads.find(d =>
       new Date(d.date).toDateString() === day.toDateString()
     )
     return dayLoad?.status || "light"
@@ -309,34 +314,34 @@ export function WeeklyCalendar() {
     if (!dbEvent) return
 
     const targetDateStr = over.id as string
-    
+
     // Calculate new time
     // 3.5rem = 56px per hour
     const pixelsPerHour = 56
     const hoursMoved = delta.y / pixelsPerHour
-    
+
     // Snap to 15 mins (0.25 hours)
     const snappedHoursMoved = Math.round(hoursMoved * 4) / 4
 
     const oldStart = new Date(dbEvent.start)
     const oldEnd = new Date(dbEvent.end)
     const durationMs = oldEnd.getTime() - oldStart.getTime()
-    
+
     const newStart = new Date(targetDateStr)
     // Add original hours + delta
     const originalHours = oldStart.getHours() + oldStart.getMinutes() / 60
     let newStartHour = originalHours + snappedHoursMoved
-    
+
     // Clamp to 0-23
     newStartHour = Math.max(0, Math.min(23.75, newStartHour))
-    
+
     newStart.setHours(Math.floor(newStartHour))
     newStart.setMinutes((newStartHour % 1) * 60)
-    
+
     const newEnd = new Date(newStart.getTime() + durationMs)
 
     // Optimistic UI update (optional, but skipping for simplicity)
-    
+
     // API Call
     try {
       const res = await fetch(`/api/events/${eventId}`, {
@@ -433,9 +438,9 @@ export function WeeklyCalendar() {
                     {events
                       .filter(e => isSameDay(new Date(e.start), day))
                       .map(event => (
-                        <DraggableEvent 
-                          key={event.id} 
-                          event={event} 
+                        <DraggableEvent
+                          key={event.id}
+                          event={event}
                           onClick={() => {
                             setEditingEvent(event)
                             setDialogOpen(true)
@@ -451,40 +456,38 @@ export function WeeklyCalendar() {
 
           {showInsights && (
             <div className="w-80 border-l border-border/50 bg-card overflow-y-auto">
-              {/* Reuse simple handler for insights panel reschedule since we have dnd now */}
-              <InsightsPanel 
-                data={insights} 
+              <InsightsPanel
+                data={insights}
                 loading={loading}
-                isFreeTier={isFreeTier}
                 onReschedule={async (eventId, toDay) => {
-                   const event = events.find(e => e.id === eventId)
-                   if (!event) return
-                   const targetDate = new Date(toDay)
-                   const newStart = new Date(event.start)
-                   newStart.setFullYear(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate())
-                   const newEnd = new Date(event.end)
-                   newEnd.setFullYear(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate())
-                   
-                   await fetch(`/api/events/${eventId}`, {
-                     method: "PUT",
-                     headers: { "Content-Type": "application/json" },
-                     body: JSON.stringify({ start: newStart.toISOString(), end: newEnd.toISOString() })
-                   })
-                   await fetchEvents()
+                  const event = events.find(e => e.id === eventId)
+                  if (!event) return
+                  const targetDate = new Date(toDay)
+                  const newStart = new Date(event.start)
+                  newStart.setFullYear(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate())
+                  const newEnd = new Date(event.end)
+                  newEnd.setFullYear(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate())
+
+                  await fetch(`/api/events/${eventId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ start: newStart.toISOString(), end: newEnd.toISOString() })
+                  })
+                  await fetchEvents()
                 }}
               />
             </div>
           )}
         </div>
 
-        <EventDialog 
+        <EventDialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open)
             if (!open) setEditingEvent(null)
           }}
           // @ts-ignore
-          onCreate={handleCreateEvent} 
+          onCreate={handleCreateEvent}
           // @ts-ignore
           onUpdate={handleUpdateEvent}
           onDelete={() => handleDeleteEvent(editingEvent?.id)}
@@ -497,8 +500,6 @@ export function WeeklyCalendar() {
             end: format(new Date(editingEvent.end), 'HH:mm'),
           } : null}
         />
-        
-        <UpgradeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} feature={upgradeFeature} />
       </div>
     </DndContext>
   )
