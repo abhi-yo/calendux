@@ -36,7 +36,7 @@ export class LocalOptimizer {
 
     for (let i = 0; i < this.maxIterations; i++) {
       const improvement = this.findBestMove(current)
-      
+
       if (!improvement) {
         console.log(`[LocalOptimizer] No more improvements found at iteration ${i}`)
         break
@@ -51,7 +51,7 @@ export class LocalOptimizer {
       current = improvement.newEvents
       currentScore = improvement.newScore
       changes.push(improvement.description)
-      
+
       console.log(`[LocalOptimizer] Applied: ${improvement.description} (score: ${currentScore.toFixed(1)})`)
     }
 
@@ -76,23 +76,21 @@ export class LocalOptimizer {
     let bestMove: { newEvents: Event[]; newScore: number; description: string } | null = null
     let bestImprovement = 0
 
-    // Find overloaded days
+    // Get loads for all days
     const dayLoads = this.getDayLoads(events)
-    const overloadedDays = Array.from(dayLoads.entries())
-      .filter(([_, load]) => load > 25)
+    const sortedDays = Array.from(dayLoads.entries())
       .sort((a, b) => b[1] - a[1]) // Heaviest first
 
-    // Find light days (candidates for receiving events)
-    const lightDays = Array.from(dayLoads.entries())
-      .filter(([_, load]) => load < 20)
-      .sort((a, b) => a[1] - b[1]) // Lightest first
+    if (sortedDays.length < 2) return null
 
-    if (overloadedDays.length === 0 || lightDays.length === 0) {
-      return null
-    }
+    // We split days into "heavy" (source) and "light" (target) candidates
+    // Consider top half as potential sources and bottom half as potential targets
+    const midPoint = Math.ceil(sortedDays.length / 2)
+    const heavyDays = sortedDays.slice(0, midPoint)
+    const lightDays = sortedDays.slice(midPoint).sort((a, b) => a[1] - b[1]) // Lightest first
 
     // Try moving flexible events from overloaded to light days
-    for (const [heavyDay, _] of overloadedDays) {
+    for (const [heavyDay, heavyLoad] of heavyDays) {
       const dayEvents = events.filter(
         e => new Date(e.start).toDateString() === heavyDay
       )
@@ -102,13 +100,22 @@ export class LocalOptimizer {
         .filter(e => (e.flexibility || 1) >= 3)
         .sort((a, b) => (b.flexibility || 1) - (a.flexibility || 1))
 
+
       for (const event of flexibleEvents) {
+        const eventCost = event.energyCost || 3
+
         for (const [lightDay, lightLoad] of lightDays) {
           // Skip if same day
           if (heavyDay === lightDay) continue
 
-          // Check if moving would still keep light day under threshold
-          if (lightLoad + (event.energyCost || 3) > 25) continue
+          const loadDiff = heavyLoad - lightLoad
+
+          // Heuristic: Only move if the load difference is significant enough (e.g. > 5)
+          // AND moving the event won't flip the imbalance too extremely
+          if (loadDiff < 5) continue
+
+          // Hard cap to prevent creating new burnout days
+          if (lightLoad + eventCost > 28) continue
 
           // Create candidate schedule
           const candidateEvents = this.moveEventToDay(events, event.id, lightDay)
@@ -135,13 +142,13 @@ export class LocalOptimizer {
    */
   private getDayLoads(events: Event[]): Map<string, number> {
     const loads = new Map<string, number>()
-    
+
     for (const event of events) {
       const day = new Date(event.start).toDateString()
       const current = loads.get(day) || 0
       loads.set(day, current + (event.energyCost || 3))
     }
-    
+
     return loads
   }
 
@@ -155,11 +162,11 @@ export class LocalOptimizer {
       const targetDate = new Date(targetDay)
       const oldStart = new Date(e.start)
       const oldEnd = new Date(e.end)
-      
+
       // Keep same time, change date
       const newStart = new Date(targetDate)
       newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), 0, 0)
-      
+
       const newEnd = new Date(targetDate)
       newEnd.setHours(oldEnd.getHours(), oldEnd.getMinutes(), 0, 0)
 
