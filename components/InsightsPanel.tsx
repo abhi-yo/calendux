@@ -42,13 +42,11 @@ interface InsightsPanelProps {
   data: InsightsData | null
   loading?: boolean
   onReschedule?: (eventId: string, toDay: string) => void
-  isFreeTier?: boolean
 }
 
 import { Button } from "@/components/ui/button"
-import { Lock } from "lucide-react"
 
-export function InsightsPanel({ data, loading, onReschedule, isFreeTier = true }: InsightsPanelProps) {
+export function InsightsPanel({ data, loading, onReschedule }: InsightsPanelProps) {
   if (loading) {
     return (
       <div className="h-full bg-muted/20 p-4">
@@ -114,7 +112,7 @@ export function InsightsPanel({ data, loading, onReschedule, isFreeTier = true }
             <div className="text-xs text-muted-foreground">Total Load</div>
           </div>
         </div>
-        
+
         {data.summary.burnoutRisk && (
           <div className="mt-3 p-2 bg-red-500/10 rounded-lg border border-red-500/20">
             <p className="text-xs text-red-600 dark:text-red-400 font-medium">
@@ -133,7 +131,7 @@ export function InsightsPanel({ data, loading, onReschedule, isFreeTier = true }
         <div className="flex gap-1">
           {data.dailyLoads.map((day, i) => (
             <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <div 
+              <div
                 className={cn("w-full rounded-t", getStatusColor(day.status))}
                 style={{ height: `${Math.max(4, Math.min(40, day.totalEnergy * 2))}px` }}
                 title={`${day.totalEnergy.toFixed(1)} energy`}
@@ -159,17 +157,11 @@ export function InsightsPanel({ data, loading, onReschedule, isFreeTier = true }
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium">Insights</h4>
-            {isFreeTier && (
-               <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                Free Mode
-               </span>
-            )}
           </div>
           <div className="space-y-3 relative">
-            {/* Show first 2 insights for free, or all for pro */}
-            {(isFreeTier ? data.insights.slice(0, 2) : data.insights).map((insight, i) => (
-              <div 
-                key={i} 
+            {data.insights.map((insight, i) => (
+              <div
+                key={i}
                 className={cn(
                   "p-3 rounded-lg border text-sm",
                   insight.type === "warning" && "bg-orange-500/5 border-orange-500/20",
@@ -193,26 +185,6 @@ export function InsightsPanel({ data, loading, onReschedule, isFreeTier = true }
                 </div>
               </div>
             ))}
-
-            {/* Blurred Overlay for Free Tier */}
-            {isFreeTier && data.insights.length > 2 && (
-               <div className="relative mt-2">
-                 <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background via-background/90 to-transparent z-10 flex flex-col items-center justify-end pb-4">
-                    <div className="flex items-center gap-2 mb-2 text-sm font-medium">
-                      <Lock className="h-4 w-4" />
-                      Unlock {data.insights.length - 2} more insights
-                    </div>
-                    <Button size="sm" variant="default" className="bg-gradient-to-r from-indigo-500 to-purple-500 border-0">
-                      Upgrade to Pro
-                    </Button>
-                 </div>
-                 {/* Fake blurred insights */}
-                 <div className="opacity-40 blur-[2px] pointer-events-none space-y-3">
-                    <div className="p-3 rounded-lg border text-sm bg-muted/20 h-24"></div>
-                    <div className="p-3 rounded-lg border text-sm bg-muted/20 h-20"></div>
-                 </div>
-               </div>
-            )}
           </div>
         </div>
       )}
