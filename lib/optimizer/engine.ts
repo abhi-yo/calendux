@@ -16,150 +16,194 @@ export type OptimizationResult = {
 }
 
 /**
- * Local Smart Optimizer
- * Uses greedy algorithm to improve schedule by moving flexible events.
+ * Keywords that indicate an event should NOT be moved.
+ */
+const NON_NEGOTIABLE_KEYWORDS = [
+  'breakfast', 'lunch', 'dinner', 'meal',
+  'sleep', 'wake', 'morning routine', 'night routine',
+  'commute', 'school', 'pickup', 'drop off', 'dropoff',
+  'medication', 'medicine', 'pills',
+  'gym', 'workout', 'exercise',
+]
+
+/**
+ * Check if an event is non-negotiable (should not be moved).
+ */
+function isNonNegotiable(event: Event): boolean {
+  if (event.type === 'HABIT') return true
+  const titleLower = event.title.toLowerCase()
+  return NON_NEGOTIABLE_KEYWORDS.some(keyword => titleLower.includes(keyword))
+}
+
+/**
+ * Check if an event can be moved (is flexible and negotiable).
+ */
+function isMovable(event: Event): boolean {
+  // Must have flexibility >= 2 (not totally fixed)
+  if ((event.flexibility || 1) < 2) return false
+  // Must not be non-negotiable
+  if (isNonNegotiable(event)) return false
+  // Must not be caused by another event (dependency)
+  if (event.causedById) return false
+  return true
+}
+
+/**
+ * Simple, aggressive optimizer that balances load across days.
  */
 export class LocalOptimizer {
-  private maxIterations = 50
 
-  /**
-   * Main optimization function.
-   * Returns optimized events and list of changes made.
-   */
-  optimize(events: Event[]): OptimizationResult {
-    const original = [...events]
-    let current = [...events]
-    let currentScore = scoreSchedule(current)
+  optimize(events: Event[], weekStartParam?: Date): OptimizationResult {
+    const scoreBefore = scoreSchedule(events)
+    let optimized = [...events]
     const changes: string[] = []
 
-    console.log(`[LocalOptimizer] Starting. Initial score: ${currentScore.toFixed(1)}`)
+    console.log(`[LocalOptimizer] Starting. ${events.length} events, initial score: ${scoreBefore.toFixed(1)}`)
 
-    for (let i = 0; i < this.maxIterations; i++) {
-      const improvement = this.findBestMove(current)
+    // Get today at midnight - never move to past
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
-      if (!improvement) {
-        console.log(`[LocalOptimizer] No more improvements found at iteration ${i}`)
-        break
+    // Calculate load per day
+    const dayLoads = new Map<string, { load: number; events: Event[]; date: Date }>()
+
+    let weekStart: Date
+
+    if (weekStartParam) {
+      weekStart = new Date(weekStartParam)
+    } else {
+      // Fallback: infer from events if no start date provided
+      if (optimized.length > 0) {
+        const eventDates = optimized.map(e => new Date(e.start))
+        const minEventDate = new Date(Math.min(...eventDates.map(d => d.getTime())))
+        weekStart = new Date(minEventDate)
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+      } else {
+        weekStart = new Date() // Default to now if no events
       }
-
-      if (improvement.newScore <= currentScore + 0.5) {
-        // Not enough improvement
-        break
-      }
-
-      // Apply the move
-      current = improvement.newEvents
-      currentScore = improvement.newScore
-      changes.push(improvement.description)
-
-      console.log(`[LocalOptimizer] Applied: ${improvement.description} (score: ${currentScore.toFixed(1)})`)
     }
+
+    // Ensure strict midnight
+    weekStart.setHours(0, 0, 0, 0)
+    console.log(`[LocalOptimizer] Optimizing week starting: ${weekStart.toDateString()}`)
+
+    // Create entries for ALL 7 days (including empty ones!)
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart)
+      date.setDate(date.getDate() + i)
+      const dayKey = date.toDateString()
+      dayLoads.set(dayKey, { load: 0, events: [], date })
+    }
+
+    // Populate with actual events
+    for (const event of optimized) {
+      const date = new Date(event.start)
+      const dayKey = date.toDateString()
+
+      const day = dayLoads.get(dayKey)
+      if (day) {
+        day.load += event.energyCost || 3
+        day.events.push(event)
+      }
+    }
+
+    // Convert to array and sort by load (heaviest first)
+    const days = Array.from(dayLoads.entries())
+      .map(([key, data]) => ({ key, ...data }))
+      .sort((a, b) => b.load - a.load)
+
+    console.log(`[LocalOptimizer] Day loads:`, days.map(d => `${d.key.slice(0, 10)}: ${d.load}`))
+
+    if (days.length < 2) {
+      console.log(`[LocalOptimizer] Not enough days to optimize`)
+      return this.createResult(events, optimized, changes, scoreBefore)
+    }
+
+    // Find the heaviest and lightest days
+    const heaviestDay = days[0]
+
+    // Use string comparison for safety to avoid timezone subtlties
+    const todayStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+
+    // Filter for future days (including today)
+    const futureDays = days.filter(d => {
+      const dayDate = new Date(d.date)
+      const dayStr = dayDate.toISOString().split('T')[0]
+      return dayStr >= todayStr
+    })
+
+    // Lightest is the last one (since sorted by load desc)
+    const lightestDay = futureDays.pop()
+
+    if (!lightestDay) {
+      console.log(`[LocalOptimizer] No future light days available. Today: ${todayStr}, Checked: ${days.map(d => d.date.toISOString().split('T')[0]).join(', ')}`)
+      return this.createResult(events, optimized, changes, scoreBefore)
+    }
+
+    // Only balance if there's significant imbalance
+    const loadDiff = heaviestDay.load - lightestDay.load
+    console.log(`[LocalOptimizer] Heaviest: ${heaviestDay.key} (${heaviestDay.load}), Lightest: ${lightestDay.key} (${lightestDay.load}), Diff: ${loadDiff}`)
+
+    if (loadDiff < 3) {
+      console.log(`[LocalOptimizer] Schedule already balanced (diff < 3)`)
+      return this.createResult(events, optimized, changes, scoreBefore)
+    }
+
+    // Find movable events from heaviest day
+    const movableEvents = heaviestDay.events
+      .filter(isMovable)
+      .sort((a, b) => (b.flexibility || 1) - (a.flexibility || 1)) // Most flexible first
+
+    console.log(`[LocalOptimizer] Found ${movableEvents.length} movable events on heaviest day`)
+
+    if (movableEvents.length === 0) {
+      console.log(`[LocalOptimizer] No movable events on heaviest day`)
+      return this.createResult(events, optimized, changes, scoreBefore)
+    }
+
+    // Move events until balanced or no more to move
+    let currentHeavyLoad = heaviestDay.load
+    let currentLightLoad = lightestDay.load
+
+    for (const event of movableEvents) {
+      const eventCost = event.energyCost || 3
+
+      // Stop if we've balanced enough
+      if (currentHeavyLoad - currentLightLoad < 3) break
+
+      // Don't overload the target day
+      if (currentLightLoad + eventCost > 25) continue
+
+      // Move the event
+      optimized = this.moveEventToDay(optimized, event.id, lightestDay.date)
+      currentHeavyLoad -= eventCost
+      currentLightLoad += eventCost
+
+      const changeMsg = `Moved "${event.title}" from ${this.formatDay(heaviestDay.date)} to ${this.formatDay(lightestDay.date)}`
+      changes.push(changeMsg)
+      console.log(`[LocalOptimizer] ${changeMsg}`)
+    }
+
+    return this.createResult(events, optimized, changes, scoreBefore)
+  }
+
+  private createResult(original: Event[], optimized: Event[], changes: string[], scoreBefore: number): OptimizationResult {
+    const scoreAfter = scoreSchedule(optimized)
+    console.log(`[LocalOptimizer] Done. ${changes.length} changes. Score: ${scoreBefore.toFixed(1)} → ${scoreAfter.toFixed(1)}`)
 
     return {
-      events: current,
+      events: optimized,
       changes,
-      scoreBefore: scoreSchedule(original),
-      scoreAfter: currentScore,
-      breakdown: getScoreBreakdown(current)
+      scoreBefore,
+      scoreAfter,
+      breakdown: getScoreBreakdown(optimized)
     }
   }
 
-  /**
-   * Find the single best move that improves the schedule.
-   */
-  private findBestMove(events: Event[]): {
-    newEvents: Event[]
-    newScore: number
-    description: string
-  } | null {
-    const currentScore = scoreSchedule(events)
-    let bestMove: { newEvents: Event[]; newScore: number; description: string } | null = null
-    let bestImprovement = 0
-
-    // Get loads for all days
-    const dayLoads = this.getDayLoads(events)
-    const sortedDays = Array.from(dayLoads.entries())
-      .sort((a, b) => b[1] - a[1]) // Heaviest first
-
-    if (sortedDays.length < 2) return null
-
-    // We split days into "heavy" (source) and "light" (target) candidates
-    // Consider top half as potential sources and bottom half as potential targets
-    const midPoint = Math.ceil(sortedDays.length / 2)
-    const heavyDays = sortedDays.slice(0, midPoint)
-    const lightDays = sortedDays.slice(midPoint).sort((a, b) => a[1] - b[1]) // Lightest first
-
-    // Try moving flexible events from overloaded to light days
-    for (const [heavyDay, heavyLoad] of heavyDays) {
-      const dayEvents = events.filter(
-        e => new Date(e.start).toDateString() === heavyDay
-      )
-
-      // Sort by flexibility (most flexible first)
-      const flexibleEvents = dayEvents
-        .filter(e => (e.flexibility || 1) >= 3)
-        .sort((a, b) => (b.flexibility || 1) - (a.flexibility || 1))
-
-
-      for (const event of flexibleEvents) {
-        const eventCost = event.energyCost || 3
-
-        for (const [lightDay, lightLoad] of lightDays) {
-          // Skip if same day
-          if (heavyDay === lightDay) continue
-
-          const loadDiff = heavyLoad - lightLoad
-
-          // Heuristic: Only move if the load difference is significant enough (e.g. > 5)
-          // AND moving the event won't flip the imbalance too extremely
-          if (loadDiff < 5) continue
-
-          // Hard cap to prevent creating new burnout days
-          if (lightLoad + eventCost > 28) continue
-
-          // Create candidate schedule
-          const candidateEvents = this.moveEventToDay(events, event.id, lightDay)
-          const newScore = scoreSchedule(candidateEvents)
-          const improvement = newScore - currentScore
-
-          if (improvement > bestImprovement) {
-            bestImprovement = improvement
-            bestMove = {
-              newEvents: candidateEvents,
-              newScore,
-              description: `Moved "${event.title}" from ${this.formatDay(heavyDay)} to ${this.formatDay(lightDay)} to balance load`
-            }
-          }
-        }
-      }
-    }
-
-    return bestMove
-  }
-
-  /**
-   * Get total energy load per day.
-   */
-  private getDayLoads(events: Event[]): Map<string, number> {
-    const loads = new Map<string, number>()
-
-    for (const event of events) {
-      const day = new Date(event.start).toDateString()
-      const current = loads.get(day) || 0
-      loads.set(day, current + (event.energyCost || 3))
-    }
-
-    return loads
-  }
-
-  /**
-   * Create new events array with one event moved to a different day.
-   */
-  private moveEventToDay(events: Event[], eventId: string, targetDay: string): Event[] {
+  private moveEventToDay(events: Event[], eventId: string, targetDate: Date): Event[] {
     return events.map(e => {
       if (e.id !== eventId) return e
 
-      const targetDate = new Date(targetDay)
       const oldStart = new Date(e.start)
       const oldEnd = new Date(e.end)
 
@@ -170,16 +214,12 @@ export class LocalOptimizer {
       const newEnd = new Date(targetDate)
       newEnd.setHours(oldEnd.getHours(), oldEnd.getMinutes(), 0, 0)
 
-      return {
-        ...e,
-        start: newStart,
-        end: newEnd
-      }
+      return { ...e, start: newStart, end: newEnd }
     })
   }
 
-  private formatDay(dateString: string): string {
-    return new Date(dateString).toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })
+  private formatDay(date: Date): string {
+    return date.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 }
 

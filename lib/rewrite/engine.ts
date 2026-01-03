@@ -16,12 +16,12 @@ export type OptimizedSchedule = {
  */
 export class RewriteEngine {
 
-    async optimizeSchedule(events: Event[], conflicts?: Conflict[]): Promise<OptimizedSchedule> {
+    async optimizeSchedule(events: Event[], conflicts?: Conflict[], weekStart?: Date): Promise<OptimizedSchedule> {
         console.log(`[RewriteEngine] Starting local optimization for ${events.length} events`)
 
         try {
             // Run local optimizer
-            const result = localOptimizer.optimize(events)
+            const result = localOptimizer.optimize(events, weekStart)
 
             // Generate explanation
             let explanation = ""

@@ -37,7 +37,8 @@ export async function POST(req: Request) {
     }
 
     // 2. Run Local Optimizer (no API key needed!)
-    const result = await rewriteEngine.optimizeSchedule(events)
+    // Pass startDate so optimizer knows the correct week range (detects empty early days)
+    const result = await rewriteEngine.optimizeSchedule(events, undefined, startDate)
 
     // 3. Apply changes to database if any events were moved
     if (result.changes.length > 0) {

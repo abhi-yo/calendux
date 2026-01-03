@@ -70,11 +70,14 @@ export interface CausalChain {
  * Calculate the energy load for a single event
  */
 export function calculateEventLoad(event: Event): number {
-  const durationHours = (new Date(event.end).getTime() - new Date(event.start).getTime()) / (1000 * 60 * 60)
+  const durationMs = new Date(event.end).getTime() - new Date(event.start).getTime()
+  // Use Math.abs or Math.max to prevent negative duration if dates are flipped
+  const durationHours = Math.abs(durationMs) / (1000 * 60 * 60)
+
   const startHour = new Date(event.start).getHours()
   const timeMultiplier = TIME_MULTIPLIERS[startHour] || 1
-  
-  return event.energyCost * durationHours * timeMultiplier
+
+  return Math.max(0, event.energyCost * durationHours * timeMultiplier)
 }
 
 /**
@@ -82,32 +85,32 @@ export function calculateEventLoad(event: Event): number {
  */
 export function calculateHourlyLoad(events: Event[], date: Date): Record<number, number> {
   const hourlyLoad: Record<number, number> = {}
-  
+
   // Initialize all hours
   for (let h = 0; h < 24; h++) {
     hourlyLoad[h] = 0
   }
-  
+
   const dayStart = new Date(date)
   dayStart.setHours(0, 0, 0, 0)
   const dayEnd = new Date(date)
   dayEnd.setHours(23, 59, 59, 999)
-  
+
   events.forEach(event => {
     const eventStart = new Date(event.start)
     const eventEnd = new Date(event.end)
-    
+
     // Skip events not on this day
     if (eventEnd < dayStart || eventStart > dayEnd) return
-    
+
     const startHour = Math.max(0, eventStart.getHours())
     const endHour = Math.min(23, eventEnd.getHours())
-    
+
     for (let h = startHour; h <= endHour; h++) {
       hourlyLoad[h] += event.energyCost * TIME_MULTIPLIERS[h]
     }
   })
-  
+
   return hourlyLoad
 }
 
@@ -119,10 +122,10 @@ export function calculateDayLoad(events: Event[], date: Date): DayLoad {
     const eventDate = new Date(e.start)
     return eventDate.toDateString() === date.toDateString()
   })
-  
+
   const hourlyLoad = calculateHourlyLoad(dayEvents, date)
   const totalEnergy = dayEvents.reduce((sum, e) => sum + calculateEventLoad(e), 0)
-  
+
   // Find peak hour
   let peakHour = 0
   let peakLoad = 0
@@ -132,7 +135,7 @@ export function calculateDayLoad(events: Event[], date: Date): DayLoad {
       peakLoad = load
     }
   })
-  
+
   // Determine status
   let status: DayLoad["status"] = "light"
   if (totalEnergy >= ENERGY_THRESHOLDS.BURNOUT) {
@@ -142,7 +145,7 @@ export function calculateDayLoad(events: Event[], date: Date): DayLoad {
   } else if (totalEnergy >= ENERGY_THRESHOLDS.MEDIUM) {
     status = "moderate"
   }
-  
+
   return {
     date,
     totalEnergy,
@@ -160,14 +163,14 @@ export function calculateDayLoad(events: Event[], date: Date): DayLoad {
 export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsight[] {
   const insights: WeekInsight[] = []
   const days: DayLoad[] = []
-  
+
   // Calculate load for each day
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart)
     day.setDate(day.getDate() + i)
     days.push(calculateDayLoad(events, day))
   }
-  
+
   // Check for burnout days
   const burnoutDays = days.filter(d => d.status === "burnout")
   if (burnoutDays.length > 0) {
@@ -179,7 +182,7 @@ export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsi
       suggestedAction: "Move flexible events to lighter days",
     })
   }
-  
+
   // Check for back-to-back heavy days
   for (let i = 0; i < days.length - 1; i++) {
     if (days[i].status === "heavy" && days[i + 1].status === "heavy") {
@@ -191,13 +194,13 @@ export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsi
       })
     }
   }
-  
+
   // Check for meeting overload
   const meetingEvents = events.filter(e => e.type === "MEETING")
   const meetingHours = meetingEvents.reduce((sum, e) => {
     return sum + (new Date(e.end).getTime() - new Date(e.start).getTime()) / (1000 * 60 * 60)
   }, 0)
-  
+
   if (meetingHours > 20) {
     insights.push({
       type: "warning",
@@ -206,7 +209,7 @@ export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsi
       suggestedAction: "Decline or reschedule non-essential meetings",
     })
   }
-  
+
   // Check for lack of focus time
   const focusEvents = events.filter(e => e.type === "FOCUS")
   if (focusEvents.length < 3) {
@@ -217,7 +220,7 @@ export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsi
       suggestedAction: "Block at least 2-3 focus sessions per week",
     })
   }
-  
+
   // Check for no breaks
   const breakEvents = events.filter(e => e.type === "BREAK")
   if (breakEvents.length === 0) {
@@ -228,7 +231,7 @@ export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsi
       suggestedAction: "Add short breaks between intensive work blocks",
     })
   }
-  
+
   // Find causal chains
   const eventsWithCause = events.filter(e => e.causedById)
   if (eventsWithCause.length > 0) {
@@ -246,7 +249,7 @@ export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsi
       }
     })
   }
-  
+
   return insights
 }
 
@@ -255,7 +258,7 @@ export function generateWeekInsights(events: Event[], weekStart: Date): WeekInsi
  */
 export function findRescheduleCandidates(events: Event[]): Event[] {
   return events
-    .filter(e => e.flexibility >= 3)
+    .filter(e => e.flexibility >= 3 && !isNonNegotiable(e))
     .sort((a, b) => b.flexibility - a.flexibility)
     .slice(0, 5)
 }
@@ -264,27 +267,37 @@ export function findRescheduleCandidates(events: Event[]): Event[] {
  * Suggest optimal rescheduling for overloaded days
  */
 export function suggestRescheduling(
-  events: Event[], 
+  events: Event[],
   weekStart: Date
 ): { event: Event; fromDay: Date; toDay: Date; reason: string }[] {
   const suggestions: { event: Event; fromDay: Date; toDay: Date; reason: string }[] = []
   const days: DayLoad[] = []
-  
+
+  // Get today at midnight for filtering past dates
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   for (let i = 0; i < 7; i++) {
     const day = new Date(weekStart)
     day.setDate(day.getDate() + i)
     days.push(calculateDayLoad(events, day))
   }
-  
-  // Find overloaded and light days
+
+  // Find overloaded and light days (only future light days)
   const overloadedDays = days.filter(d => d.status === "heavy" || d.status === "burnout")
-  const lightDays = days.filter(d => d.status === "light")
-  
+  const lightDays = days.filter(d => {
+    if (d.status !== "light") return false
+    const dayDate = new Date(d.date)
+    dayDate.setHours(0, 0, 0, 0)
+    return dayDate >= today
+  })
+
   overloadedDays.forEach(heavyDay => {
+    // Filter out non-negotiable events (meals, habits, etc.)
     const flexibleEvents = heavyDay.events
-      .filter(e => e.flexibility >= 3)
+      .filter(e => e.flexibility >= 3 && !isNonNegotiable(e))
       .sort((a, b) => b.flexibility - a.flexibility)
-    
+
     if (flexibleEvents.length > 0 && lightDays.length > 0) {
       suggestions.push({
         event: flexibleEvents[0],
@@ -294,12 +307,29 @@ export function suggestRescheduling(
       })
     }
   })
-  
+
   return suggestions
 }
 
 function formatDay(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+/**
+ * Keywords that indicate an event should NOT be moved.
+ */
+const NON_NEGOTIABLE_KEYWORDS = [
+  'breakfast', 'lunch', 'dinner', 'meal',
+  'sleep', 'wake', 'morning routine', 'night routine',
+  'commute', 'school', 'pickup', 'drop off', 'dropoff',
+  'medication', 'medicine', 'pills',
+  'gym', 'workout', 'exercise',
+]
+
+function isNonNegotiable(event: Event): boolean {
+  if (event.type === 'HABIT') return true
+  const titleLower = event.title.toLowerCase()
+  return NON_NEGOTIABLE_KEYWORDS.some(keyword => titleLower.includes(keyword))
 }
 
 /**
@@ -309,7 +339,11 @@ function formatDay(date: Date): string {
 export function optimizeSchedule(events: Event[], weekStart: Date): Event[] {
   // Clone events to avoid mutating original array
   let optimizedEvents = JSON.parse(JSON.stringify(events)) as Event[]
-  
+
+  // Get today at midnight for past-date filtering
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   // 1. Calculate daily loads
   const days: DayLoad[] = []
   for (let i = 0; i < 7; i++) {
@@ -321,14 +355,19 @@ export function optimizeSchedule(events: Event[], weekStart: Date): Event[] {
 
   // 2. Identify unbalanced days
   const heavyDays = days.filter(d => d.status === "heavy" || d.status === "burnout")
-  const lightDays = days.filter(d => d.status === "light" || d.status === "moderate")
-    .sort((a, b) => a.totalEnergy - b.totalEnergy) // Sort by lightest first
+  // Filter out past days from light days - can't move events to the past
+  const lightDays = days.filter(d => {
+    if (d.status !== "light" && d.status !== "moderate") return false
+    const dayDate = new Date(d.date)
+    dayDate.setHours(0, 0, 0, 0)
+    return dayDate >= today
+  }).sort((a, b) => a.totalEnergy - b.totalEnergy) // Sort by lightest first
 
   // 3. Move events
   heavyDays.forEach(heavyDay => {
-    // Find movable events (flexibility > 3, not caused by others)
+    // Find movable events (flexibility > 3, not caused by others, not non-negotiable)
     const movableEvents = heavyDay.events
-      .filter(e => e.flexibility >= 4 && !e.causedById)
+      .filter(e => e.flexibility >= 4 && !e.causedById && !isNonNegotiable(e))
       .sort((a, b) => b.energyCost - a.energyCost) // Move big drains first
 
     movableEvents.forEach(event => {
@@ -363,3 +402,4 @@ export function optimizeSchedule(events: Event[], weekStart: Date): Event[] {
   // Return only the events that changed? No, return full set for simplicity, UI diffs it.
   return optimizedEvents
 }
+
