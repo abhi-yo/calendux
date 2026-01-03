@@ -366,8 +366,14 @@ export function WeeklyCalendar() {
   }
 
 
+  import { InsightsPanel } from "@/components/InsightsPanel"
+  import { TimezoneOnboarding } from "@/components/TimezoneOnboarding"
+  import { UserButton } from "@clerk/nextjs"
+  // ...
+
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <TimezoneOnboarding />
       <div className="flex flex-col h-full bg-background text-foreground">
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-3 bg-card border-b border-border/50 shadow-sm">
