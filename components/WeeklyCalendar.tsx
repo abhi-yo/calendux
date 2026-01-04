@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Sparkles, Sun, Moon } from "lucide-react"
 import { EventDialog } from "@/components/EventDialog"
 import { InsightsPanel } from "@/components/InsightsPanel"
+import { TimezoneOnboarding } from "@/components/TimezoneOnboarding"
 import { UserButton } from "@clerk/nextjs"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
@@ -14,12 +15,15 @@ import { toast } from "sonner"
 import {
   DndContext,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
   useDraggable,
   useDroppable,
   useSensors,
   useSensor,
   MouseSensor,
-  TouchSensor
+  TouchSensor,
+  PointerSensor,
 } from "@dnd-kit/core"
 
 // Event type matching API response
@@ -50,45 +54,27 @@ type InsightsData = {
   summary: { totalEnergy: number; burnoutRisk: boolean; heavyDays: number; eventCount: number }
 }
 
-// --- DnD Components ---
-
-function DraggableEvent({ event, onClick, getEventColor }: { event: Event, onClick: () => void, getEventColor: (t: string) => string }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: event.id,
-    data: { event }
-  })
-
+// --- Event Card Component (used for both draggable and overlay) ---
+function EventCard({ event, getEventColor, isDragging = false, isOverlay = false }: {
+  event: Event,
+  getEventColor: (t: string) => string,
+  isDragging?: boolean,
+  isOverlay?: boolean
+}) {
   const startDate = new Date(event.start)
   const endDate = new Date(event.end)
-  const startHour = startDate.getHours() + startDate.getMinutes() / 60
   const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
-
-  // Use CSS translate for performance during drag
-  // During drag, we don't change 'top', we just apply transform
-  const style: React.CSSProperties = {
-    position: 'absolute',
-    top: `${startHour * 3.5}rem`,
-    height: `${Math.max(duration * 3.5, 1.5)}rem`,
-    left: '0.25rem',
-    right: '0.25rem',
-    zIndex: isDragging ? 50 : 10,
-    opacity: isDragging ? 0.8 : 1,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-  }
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
       className={cn(
-        "text-white text-xs p-2 rounded-lg cursor-grab active:cursor-grabbing transition-shadow",
+        "text-white text-xs p-2 rounded-lg transition-all duration-200",
         "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_2px_4px_0_rgba(0,0,0,0.2)]",
         getEventColor(event.type),
-        isDragging && "shadow-2xl ring-2 ring-primary"
+        !isOverlay && "cursor-grab active:cursor-grabbing hover:scale-[1.02] hover:shadow-lg",
+        isOverlay && "scale-105 shadow-2xl ring-2 ring-primary/50 rotate-1",
+        isDragging && "opacity-40"
       )}
-      onClick={onClick}
     >
       <div className="font-medium truncate">{event.title}</div>
       {duration >= 0.75 && (
@@ -100,14 +86,84 @@ function DraggableEvent({ event, onClick, getEventColor }: { event: Event, onCli
   )
 }
 
-function DroppableDay({ day, children, className }: { day: Date, children: React.ReactNode, className?: string }) {
-  const { setNodeRef } = useDroppable({
-    id: format(day, "yyyy-MM-dd"), // Use date string as ID
+// --- DnD Components ---
+function DraggableEvent({ event, onClick, getEventColor, isDragging }: {
+  event: Event,
+  onClick: () => void,
+  getEventColor: (t: string) => string,
+  isDragging: boolean
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: event.id,
+    data: { event }
+  })
+
+  const startDate = new Date(event.start)
+  const endDate = new Date(event.end)
+  const startHour = startDate.getHours() + startDate.getMinutes() / 60
+  const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+
+  const style: React.CSSProperties = {
+    position: 'absolute',
+    top: `${startHour * 3.5}rem`,
+    height: `${Math.max(duration * 3.5, 1.5)}rem`,
+    left: '0.25rem',
+    right: '0.25rem',
+    zIndex: isDragging ? 5 : 10,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transition: isDragging ? 'none' : 'transform 150ms ease',
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+    >
+      <EventCard event={event} getEventColor={getEventColor} isDragging={isDragging} />
+    </div>
+  )
+}
+
+function DroppableDay({ day, children, className, isOver }: {
+  day: Date,
+  children: React.ReactNode,
+  className?: string,
+  isOver?: boolean
+}) {
+  const { setNodeRef, isOver: dropIsOver } = useDroppable({
+    id: format(day, "yyyy-MM-dd"),
   })
 
   return (
-    <div ref={setNodeRef} className={className}>
+    <div
+      ref={setNodeRef}
+      className={cn(
+        className,
+        "transition-colors duration-200",
+        (isOver || dropIsOver) && "bg-primary/5"
+      )}
+    >
       {children}
+    </div>
+  )
+}
+
+// --- Clickable Time Slot ---
+function TimeSlot({ hour, onClick }: { hour: number, onClick: () => void }) {
+  return (
+    <div
+      className="h-14 border-b border-border/30 hover:bg-primary/5 transition-colors duration-150 cursor-pointer group"
+      onClick={onClick}
+    >
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-[10px] text-muted-foreground pl-1 pt-0.5">
+        + Add event
+      </div>
     </div>
   )
 }
@@ -122,21 +178,28 @@ export function WeeklyCalendar() {
   const [editingEvent, setEditingEvent] = React.useState<any>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [optimizing, setOptimizing] = React.useState(false)
+  const [activeId, setActiveId] = React.useState<string | null>(null)
+  const [newEventDefaults, setNewEventDefaults] = React.useState<{ date: string; start: string } | null>(null)
 
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
-  // Sensors for drag activation
+  // Improved sensors for smoother drag experience
   const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Slightly lower for more responsive feel
+      },
+    }),
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 10, // Drag needs 10px movement to start
+        distance: 8,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,
-        tolerance: 5,
+        delay: 200,
+        tolerance: 8,
       },
     })
   )
@@ -232,6 +295,7 @@ export function WeeklyCalendar() {
       if (res.ok) {
         toast.success("Event created")
         setDialogOpen(false)
+        setNewEventDefaults(null)
         await fetchEvents()
         await fetchInsights()
       }
@@ -304,9 +368,15 @@ export function WeeklyCalendar() {
     return dayLoad?.status || "light"
   }
 
-  // --- Drag End Handler ---
+  // --- Drag Handlers ---
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over, delta } = event
+    setActiveId(null)
+
     if (!over) return
 
     const eventId = active.id as string
@@ -315,34 +385,34 @@ export function WeeklyCalendar() {
 
     const targetDateStr = over.id as string
 
-    // Calculate new time
-    // 3.5rem = 56px per hour
+    // Calculate new time - 3.5rem = 56px per hour
     const pixelsPerHour = 56
     const hoursMoved = delta.y / pixelsPerHour
-
-    // Snap to 15 mins (0.25 hours)
-    const snappedHoursMoved = Math.round(hoursMoved * 4) / 4
+    const snappedHoursMoved = Math.round(hoursMoved * 4) / 4 // Snap to 15 mins
 
     const oldStart = new Date(dbEvent.start)
     const oldEnd = new Date(dbEvent.end)
     const durationMs = oldEnd.getTime() - oldStart.getTime()
 
     const newStart = new Date(targetDateStr)
-    // Add original hours + delta
     const originalHours = oldStart.getHours() + oldStart.getMinutes() / 60
     let newStartHour = originalHours + snappedHoursMoved
-
-    // Clamp to 0-23
     newStartHour = Math.max(0, Math.min(23.75, newStartHour))
 
     newStart.setHours(Math.floor(newStartHour))
     newStart.setMinutes((newStartHour % 1) * 60)
+    newStart.setSeconds(0)
+    newStart.setMilliseconds(0)
 
     const newEnd = new Date(newStart.getTime() + durationMs)
 
-    // Optimistic UI update (optional, but skipping for simplicity)
+    // Optimistic update for smooth UX
+    setEvents(prev => prev.map(e =>
+      e.id === eventId
+        ? { ...e, start: newStart.toISOString(), end: newEnd.toISOString() }
+        : e
+    ))
 
-    // API Call
     try {
       const res = await fetch(`/api/events/${eventId}`, {
         method: "PUT",
@@ -355,24 +425,40 @@ export function WeeklyCalendar() {
 
       if (res.ok) {
         toast.success(`Moved to ${format(newStart, 'EEE HH:mm')}`)
-        await fetchEvents()
         await fetchInsights()
       } else {
         toast.error("Failed to move event")
+        await fetchEvents() // Revert on error
       }
     } catch {
       toast.error("Move failed")
+      await fetchEvents() // Revert on error
     }
   }
 
+  const handleDragCancel = () => {
+    setActiveId(null)
+  }
 
-  import { InsightsPanel } from "@/components/InsightsPanel"
-  import { TimezoneOnboarding } from "@/components/TimezoneOnboarding"
-  import { UserButton } from "@clerk/nextjs"
-  // ...
+  // Click on time slot to create event
+  const handleTimeSlotClick = (day: Date, hour: number) => {
+    const dateStr = format(day, "yyyy-MM-dd")
+    const startTime = `${hour.toString().padStart(2, '0')}:00`
+    setNewEventDefaults({ date: dateStr, start: startTime })
+    setEditingEvent(null)
+    setDialogOpen(true)
+  }
+
+  // Get the active event for the drag overlay
+  const activeEvent = activeId ? events.find(e => e.id === activeId) : null
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       <TimezoneOnboarding />
       <div className="flex flex-col h-full bg-background text-foreground">
         {/* Header */}
@@ -397,7 +483,7 @@ export function WeeklyCalendar() {
               {showInsights ? <PanelRightClose className="h-4 w-4 mr-1.5" /> : <PanelRightOpen className="h-4 w-4 mr-1.5" />}
               Insights
             </Button>
-            <Button size="sm" onClick={() => { setEditingEvent(null); setDialogOpen(true); }}>
+            <Button size="sm" onClick={() => { setEditingEvent(null); setNewEventDefaults(null); setDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-1.5" /> New Event
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
@@ -439,7 +525,11 @@ export function WeeklyCalendar() {
                 {days.map((day) => (
                   <DroppableDay key={day.toString()} day={day} className="border-r last:border-r-0 border-border relative">
                     {hours.map((hour) => (
-                      <div key={hour} className="h-14 border-b border-border/30" />
+                      <TimeSlot
+                        key={hour}
+                        hour={hour}
+                        onClick={() => handleTimeSlotClick(day, hour)}
+                      />
                     ))}
                     {events
                       .filter(e => isSameDay(new Date(e.start), day))
@@ -447,8 +537,10 @@ export function WeeklyCalendar() {
                         <DraggableEvent
                           key={event.id}
                           event={event}
+                          isDragging={event.id === activeId}
                           onClick={() => {
                             setEditingEvent(event)
+                            setNewEventDefaults(null)
                             setDialogOpen(true)
                           }}
                           getEventColor={getEventColor}
@@ -486,11 +578,26 @@ export function WeeklyCalendar() {
           )}
         </div>
 
+        {/* Drag Overlay - This creates the smooth floating preview */}
+        <DragOverlay dropAnimation={{
+          duration: 200,
+          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+        }}>
+          {activeEvent ? (
+            <div className="w-[calc((100vw-4rem-20rem)/7-0.5rem)] min-w-32">
+              <EventCard event={activeEvent} getEventColor={getEventColor} isOverlay />
+            </div>
+          ) : null}
+        </DragOverlay>
+
         <EventDialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open)
-            if (!open) setEditingEvent(null)
+            if (!open) {
+              setEditingEvent(null)
+              setNewEventDefaults(null)
+            }
           }}
           // @ts-ignore
           onCreate={handleCreateEvent}
@@ -504,6 +611,10 @@ export function WeeklyCalendar() {
             date: new Date(editingEvent.start).toISOString().split('T')[0],
             start: format(new Date(editingEvent.start), 'HH:mm'),
             end: format(new Date(editingEvent.end), 'HH:mm'),
+          } : newEventDefaults ? {
+            date: newEventDefaults.date,
+            start: newEventDefaults.start,
+            end: `${(parseInt(newEventDefaults.start.split(':')[0]) + 1).toString().padStart(2, '0')}:00`,
           } : null}
         />
       </div>
