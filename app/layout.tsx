@@ -1,13 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope } from "next/font/google";
+import { Inter, Instrument_Serif } from "next/font/google";
+import { Doto } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const doto = Doto({
+  variable: "--font-doto",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument",
+  subsets: ["latin"],
+  weight: "400",
   display: "swap",
 });
 
@@ -105,7 +119,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <body
-          className={`${manrope.variable} antialiased font-sans`}
+          className={`${inter.variable} ${doto.variable} ${instrumentSerif.variable} antialiased font-sans`}
         >
           <ThemeProvider
             attribute="class"
