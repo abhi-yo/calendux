@@ -8,9 +8,13 @@ import { ChevronLeft, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, 
 import { EventDialog } from "@/components/EventDialog"
 import { InsightsPanel } from "@/components/InsightsPanel"
 import { TimezoneOnboarding } from "@/components/TimezoneOnboarding"
+import { OnboardingTour } from "@/components/OnboardingTour"
+import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp"
 import { UserButton } from "@clerk/nextjs"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
+import { useUndoableAction } from "@/hooks/useUndoableAction"
 
 import {
   DndContext,
@@ -248,6 +252,34 @@ export function WeeklyCalendar() {
   const prevWeek = () => setCurrentDate(addDays(currentDate, -7))
   const today = () => setCurrentDate(new Date())
 
+  // Refresh function for undoable actions
+  const refreshAll = React.useCallback(async () => {
+    await Promise.all([fetchEvents(), fetchInsights()])
+  }, [fetchEvents, fetchInsights])
+
+  // Undoable actions hook
+  const { deleteWithUndo, moveWithUndo } = useUndoableAction({ onRefresh: refreshAll })
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onNewEvent: () => {
+      setEditingEvent(null)
+      setNewEventDefaults(null)
+      setDialogOpen(true)
+    },
+    onToday: today,
+    onNextWeek: nextWeek,
+    onPrevWeek: prevWeek,
+    onEscape: () => {
+      if (dialogOpen) {
+        setDialogOpen(false)
+        setEditingEvent(null)
+        setNewEventDefaults(null)
+      }
+    },
+    enabled: !activeId, // Disable during drag
+  })
+
   const handleOptimize = async () => {
     setOptimizing(true)
     try {
@@ -334,19 +366,14 @@ export function WeeklyCalendar() {
 
   const handleDeleteEvent = async (eventId?: string) => {
     const id = eventId || editingEvent?.id
-    if (!id) return
-    try {
-      const res = await fetch(`/api/events/${id}`, { method: "DELETE" })
-      if (res.ok) {
-        toast.success("Event deleted")
-        setDialogOpen(false)
-        setEditingEvent(null)
-        await fetchEvents()
-        await fetchInsights()
-      }
-    } catch {
-      toast.error("Error deleting event")
-    }
+    const eventToDelete = events.find(e => e.id === id)
+    if (!id || !eventToDelete) return
+
+    setDialogOpen(false)
+    setEditingEvent(null)
+
+    // Use undoable delete
+    await deleteWithUndo(eventToDelete)
   }
 
   const getEventColor = (type: string) => {
@@ -413,27 +440,9 @@ export function WeeklyCalendar() {
         : e
     ))
 
-    try {
-      const res = await fetch(`/api/events/${eventId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          start: newStart.toISOString(),
-          end: newEnd.toISOString(),
-        }),
-      })
-
-      if (res.ok) {
-        toast.success(`Moved to ${format(newStart, 'EEE HH:mm')}`)
-        await fetchInsights()
-      } else {
-        toast.error("Failed to move event")
-        await fetchEvents() // Revert on error
-      }
-    } catch {
-      toast.error("Move failed")
-      await fetchEvents() // Revert on error
-    }
+    // Use undoable move
+    await moveWithUndo(dbEvent, newStart, newEnd, oldStart, oldEnd)
+    await fetchInsights()
   }
 
   const handleDragCancel = () => {
@@ -460,6 +469,7 @@ export function WeeklyCalendar() {
       onDragCancel={handleDragCancel}
     >
       <TimezoneOnboarding />
+      <OnboardingTour />
       <div className="flex flex-col h-full bg-background text-foreground">
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-3 bg-card border-b border-border/50 shadow-sm">
@@ -489,6 +499,7 @@ export function WeeklyCalendar() {
             <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
               {mounted ? (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />) : <Sun className="h-4 w-4" />}
             </Button>
+            <KeyboardShortcutsHelp />
             <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </header>
