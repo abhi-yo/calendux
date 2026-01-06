@@ -48,13 +48,32 @@ export async function PUT(req: Request) {
 
   try {
     const body = await req.json()
-    const { timezone } = body
+    const { timezone, onboardingCompleted } = body
+
+    // Get existing user to preserve preferences
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+
+    // Build update data
+    const updateData: Record<string, unknown> = {}
+
+    if (timezone !== undefined) {
+      updateData.timezone = timezone
+    }
+
+    if (onboardingCompleted !== undefined) {
+      // Merge with existing preferences
+      const currentPreferences = (existingUser?.preferences as Record<string, unknown>) || {}
+      updateData.preferences = {
+        ...currentPreferences,
+        onboardingCompleted: onboardingCompleted
+      }
+    }
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: {
-        timezone: timezone // Update timezone
-      }
+      data: updateData
     })
 
     return NextResponse.json(user)
@@ -63,3 +82,4 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
+
