@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { format } from "date-fns"
-import { CalendarIcon, Plus, Zap, Clock, Shuffle, AlertTriangle } from "lucide-react"
+import { CalendarIcon, Plus, Zap, Clock, Shuffle, AlertTriangle, Repeat } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -38,6 +38,14 @@ const EVENT_TYPES = [
   { value: "PERSONAL", label: "Personal" },
 ]
 
+const RECURRENCE_OPTIONS = [
+  { value: "none", label: "Does not repeat" },
+  { value: "FREQ=DAILY", label: "Daily" },
+  { value: "FREQ=WEEKLY", label: "Weekly" },
+  { value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", label: "Weekdays" },
+  { value: "FREQ=MONTHLY", label: "Monthly" },
+]
+
 // Generate time options (every 15 minutes)
 const TIME_OPTIONS = Array.from({ length: 96 }, (_, i) => {
   const hours = Math.floor(i / 4)
@@ -59,6 +67,8 @@ interface EventFormData {
   flexibility: number
   causedById?: string
   notes?: string
+  isRecurring?: boolean
+  recurrenceRule?: string
 }
 
 export interface EventDialogProps {
@@ -72,12 +82,12 @@ export interface EventDialogProps {
   onOpenChange?: (open: boolean) => void
 }
 
-export function EventDialog({ 
-  onCreate, 
-  onUpdate, 
-  onDelete, 
-  existingEvents = [], 
-  trigger, 
+export function EventDialog({
+  onCreate,
+  onUpdate,
+  onDelete,
+  existingEvents = [],
+  trigger,
   event,
   open: controlledOpen,
   onOpenChange: setControlledOpen
@@ -99,6 +109,8 @@ export function EventDialog({
     flexibility: 3,
     causedById: "",
     notes: "",
+    isRecurring: false,
+    recurrenceRule: "",
   })
 
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date())
@@ -120,6 +132,8 @@ export function EventDialog({
         flexibility: 3,
         causedById: "",
         notes: "",
+        isRecurring: false,
+        recurrenceRule: "",
       })
       setSelectedDate(new Date())
     }
@@ -157,7 +171,7 @@ export function EventDialog({
               {event ? "Modify event details." : "Add a new event with energy and causality tracking."}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             {/* Title */}
             <div className="space-y-2">
@@ -247,8 +261,8 @@ export function EventDialog({
                     className={cn(
                       "px-3 py-1.5 text-sm rounded-full border transition-all",
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
-                      formData.type === type.value 
-                        ? "bg-primary text-primary-foreground border-primary" 
+                      formData.type === type.value
+                        ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background border-border hover:bg-muted"
                     )}
                   >
@@ -273,8 +287,8 @@ export function EventDialog({
                     className={cn(
                       "flex-1 py-2 text-sm rounded border transition-all",
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
-                      formData.energyCost === level 
-                        ? "bg-primary text-primary-foreground" 
+                      formData.energyCost === level
+                        ? "bg-primary text-primary-foreground"
                         : "bg-background hover:bg-muted"
                     )}
                   >
@@ -302,8 +316,8 @@ export function EventDialog({
                     className={cn(
                       "flex-1 py-2 text-sm rounded border transition-all",
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
-                      formData.importance === level 
-                        ? "bg-primary text-primary-foreground" 
+                      formData.importance === level
+                        ? "bg-primary text-primary-foreground"
                         : "bg-background hover:bg-muted"
                     )}
                   >
@@ -328,8 +342,8 @@ export function EventDialog({
                     className={cn(
                       "flex-1 py-2 text-sm rounded border transition-all",
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
-                      formData.flexibility === level 
-                        ? "bg-primary text-primary-foreground" 
+                      formData.flexibility === level
+                        ? "bg-primary text-primary-foreground"
                         : "bg-background hover:bg-muted"
                     )}
                   >
@@ -342,6 +356,40 @@ export function EventDialog({
               </p>
             </div>
 
+            {/* Recurring Event */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Repeat className="h-4 w-4 text-green-500" />
+                Repeat
+              </label>
+              <Select
+                value={formData.recurrenceRule || "none"}
+                onValueChange={(v) => {
+                  if (v === "none") {
+                    setFormData(prev => ({ ...prev, isRecurring: false, recurrenceRule: "" }))
+                  } else {
+                    setFormData(prev => ({ ...prev, isRecurring: true, recurrenceRule: v }))
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Does not repeat" />
+                </SelectTrigger>
+                <SelectContent>
+                  {RECURRENCE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.isRecurring && (
+                <p className="text-xs text-muted-foreground">
+                  This event will repeat based on your selection.
+                </p>
+              )}
+            </div>
+
             {/* Caused By (Causal Link) */}
             {existingEvents.length > 0 && (
               <div className="space-y-2">
@@ -349,8 +397,8 @@ export function EventDialog({
                   <Clock className="h-4 w-4 text-purple-500" />
                   Caused By (Optional)
                 </label>
-                <Select 
-                  value={formData.causedById || "none"} 
+                <Select
+                  value={formData.causedById || "none"}
                   onValueChange={(v) => updateField("causedById", v === "none" ? "" : v)}
                 >
                   <SelectTrigger>
@@ -361,9 +409,9 @@ export function EventDialog({
                     {existingEvents.map(evt => (
                       // @ts-ignore
                       (event?.id && evt.id === event.id) ? null :
-                      <SelectItem key={evt.id} value={evt.id}>
-                        {evt.title}
-                      </SelectItem>
+                        <SelectItem key={evt.id} value={evt.id}>
+                          {evt.title}
+                        </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -387,9 +435,9 @@ export function EventDialog({
 
           <DialogFooter className="gap-2 sm:gap-0">
             {event && onDelete && (
-              <Button 
-                type="button" 
-                variant="destructive" 
+              <Button
+                type="button"
+                variant="destructive"
                 onClick={() => {
                   if (confirm("Delete this event?")) {
                     onDelete()
