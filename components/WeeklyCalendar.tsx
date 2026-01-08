@@ -4,17 +4,20 @@ import * as React from "react"
 import { addDays, format, startOfWeek, eachDayOfInterval, endOfWeek, isSameDay } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Sparkles, Sun, Moon } from "lucide-react"
+import { ChevronLeft, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Sparkles, Sun, Moon, Settings } from "lucide-react"
 import { EventDialog } from "@/components/EventDialog"
 import { InsightsPanel } from "@/components/InsightsPanel"
 import { TimezoneOnboarding } from "@/components/TimezoneOnboarding"
 import { OnboardingTour } from "@/components/OnboardingTour"
 import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp"
+import { QuickAddInput } from "@/components/QuickAddInput"
 import { UserButton } from "@clerk/nextjs"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import { useUndoableAction } from "@/hooks/useUndoableAction"
+import { useEventNotifications } from "@/hooks/useEventNotifications"
+import Link from "next/link"
 
 import {
   DndContext,
@@ -280,6 +283,13 @@ export function WeeklyCalendar() {
     enabled: !activeId, // Disable during drag
   })
 
+  // Event notifications
+  useEventNotifications({
+    events,
+    enabled: true,
+    notifyBefore: 15,
+  })
+
   const handleOptimize = async () => {
     setOptimizing(true)
     try {
@@ -484,22 +494,64 @@ export function WeeklyCalendar() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleOptimize} disabled={optimizing}>
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+            <Button variant="outline" size="sm" onClick={handleOptimize} disabled={optimizing} className="hidden sm:flex">
               <Sparkles className="h-4 w-4 mr-1.5" />
               {optimizing ? "Optimizing..." : "AI Optimize"}
             </Button>
-            <Button variant={showInsights ? "secondary" : "outline"} size="sm" onClick={() => setShowInsights(!showInsights)}>
+            <Button variant="outline" size="icon" onClick={handleOptimize} disabled={optimizing} className="sm:hidden">
+              <Sparkles className="h-4 w-4" />
+            </Button>
+            <Button variant={showInsights ? "secondary" : "outline"} size="sm" onClick={() => setShowInsights(!showInsights)} className="hidden sm:flex">
               {showInsights ? <PanelRightClose className="h-4 w-4 mr-1.5" /> : <PanelRightOpen className="h-4 w-4 mr-1.5" />}
               Insights
             </Button>
-            <Button size="sm" onClick={() => { setEditingEvent(null); setNewEventDefaults(null); setDialogOpen(true); }}>
+            <Button variant={showInsights ? "secondary" : "outline"} size="icon" onClick={() => setShowInsights(!showInsights)} className="sm:hidden">
+              {showInsights ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+            </Button>
+            <QuickAddInput
+              onCreateEvent={async (parsedEvent) => {
+                try {
+                  const res = await fetch("/api/events", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      title: parsedEvent.title,
+                      description: parsedEvent.description,
+                      start: new Date(parsedEvent.start).toISOString(),
+                      end: new Date(parsedEvent.end).toISOString(),
+                      allDay: parsedEvent.allDay,
+                      type: parsedEvent.type,
+                      energyCost: parsedEvent.energyCost,
+                      flexibility: parsedEvent.flexibility,
+                      location: parsedEvent.location,
+                    }),
+                  })
+                  if (res.ok) {
+                    toast.success("Event created via Quick Add")
+                    await fetchEvents()
+                    await fetchInsights()
+                  }
+                } catch (error) {
+                  toast.error("Failed to create event")
+                }
+              }}
+            />
+            <Button size="sm" onClick={() => { setEditingEvent(null); setNewEventDefaults(null); setDialogOpen(true); }} className="hidden sm:flex">
               <Plus className="h-4 w-4 mr-1.5" /> New Event
+            </Button>
+            <Button size="icon" onClick={() => { setEditingEvent(null); setNewEventDefaults(null); setDialogOpen(true); }} className="sm:hidden">
+              <Plus className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
               {mounted ? (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />) : <Sun className="h-4 w-4" />}
             </Button>
             <KeyboardShortcutsHelp />
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" title="Settings">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </Link>
             <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </header>
