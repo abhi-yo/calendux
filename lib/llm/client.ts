@@ -123,65 +123,156 @@ export async function parseNaturalLanguageEvent(
 }
 
 /**
- * Basic fallback parser when LLM is unavailable.
- * Uses simple pattern matching for common phrases.
+ * Enhanced fallback parser when LLM is unavailable.
+ * Uses pattern matching for common natural language phrases.
  */
 function parseWithFallback(input: string): ParseResult {
     const now = new Date()
-    const tomorrow = new Date(now)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
     let start = new Date(now)
     let title = input
+    let allDay = false
 
-    // Simple time detection
-    const timeMatch = input.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i)
+    // === WEEKDAY PARSING ===
+    const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+    const weekdayMatch = input.toLowerCase().match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i)
+    if (weekdayMatch) {
+        const targetDay = weekdays.indexOf(weekdayMatch[1].toLowerCase())
+        const currentDay = now.getDay()
+        let daysToAdd = targetDay - currentDay
+        if (daysToAdd <= 0) daysToAdd += 7 // Next occurrence
+        start = new Date(now)
+        start.setDate(now.getDate() + daysToAdd)
+        start.setHours(9, 0, 0, 0) // Default to 9am
+    }
+
+    // === RELATIVE DATE PARSING ===
+    if (/\btomorrow\b/i.test(input)) {
+        start = new Date(now)
+        start.setDate(now.getDate() + 1)
+        start.setHours(9, 0, 0, 0)
+    } else if (/\btoday\b/i.test(input)) {
+        start = new Date(now)
+        // Keep current time or set to next hour
+        start.setMinutes(0, 0, 0)
+        if (start <= now) {
+            start.setHours(start.getHours() + 1)
+        }
+    } else if (/\bnext week\b/i.test(input)) {
+        start = new Date(now)
+        start.setDate(now.getDate() + 7)
+        start.setHours(9, 0, 0, 0)
+    }
+
+    // === TIME OF DAY KEYWORDS ===
+    if (/\b(this\s+)?morning\b/i.test(input)) {
+        start.setHours(9, 0, 0, 0)
+    } else if (/\b(this\s+)?afternoon\b/i.test(input)) {
+        start.setHours(14, 0, 0, 0)
+    } else if (/\b(this\s+)?evening\b/i.test(input)) {
+        start.setHours(18, 0, 0, 0)
+        // If "this evening" and it's already past 6pm, leave as is
+        if (/\bthis\s+evening\b/i.test(input) && !weekdayMatch && !/\btomorrow\b/i.test(input)) {
+            const today = new Date(now)
+            today.setHours(18, 0, 0, 0)
+            if (now.getHours() < 18) {
+                start = today
+            }
+        }
+    } else if (/\bnight\b/i.test(input)) {
+        start.setHours(20, 0, 0, 0)
+    }
+
+    // === SPECIFIC TIME PARSING (overrides time of day) ===
+    const timeMatch = input.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
     if (timeMatch) {
         let hours = parseInt(timeMatch[1])
         const minutes = parseInt(timeMatch[2] || "0")
         const ampm = timeMatch[3]?.toLowerCase()
 
+        // Handle 12-hour format
         if (ampm === "pm" && hours < 12) hours += 12
         if (ampm === "am" && hours === 12) hours = 0
+
+        // If no am/pm specified, infer based on context
+        if (!ampm && hours >= 1 && hours <= 6) {
+            // Likely PM for 1-6 without am/pm
+            hours += 12
+        }
 
         start.setHours(hours, minutes, 0, 0)
     }
 
-    // Simple date detection
-    if (/tomorrow/i.test(input)) {
-        start = tomorrow
-        if (timeMatch) {
-            let hours = parseInt(timeMatch[1])
-            const minutes = parseInt(timeMatch[2] || "0")
-            const ampm = timeMatch[3]?.toLowerCase()
-            if (ampm === "pm" && hours < 12) hours += 12
-            if (ampm === "am" && hours === 12) hours = 0
-            start.setHours(hours, minutes, 0, 0)
+    // === DURATION PARSING ===
+    let durationMinutes = 60 // Default 1 hour
+    const durationMatch = input.match(/\bfor\s+(\d+)\s*(hour|hr|minute|min)s?\b/i)
+    if (durationMatch) {
+        const value = parseInt(durationMatch[1])
+        const unit = durationMatch[2].toLowerCase()
+        if (unit.startsWith("hour") || unit.startsWith("hr")) {
+            durationMinutes = value * 60
+        } else {
+            durationMinutes = value
         }
+    } else if (/\bquick\b/i.test(input)) {
+        durationMinutes = 15
+    } else if (/\b(coffee|lunch)\b/i.test(input)) {
+        durationMinutes = 60
     }
 
-    // Extract title (remove time/date references)
+    // === CHECK FOR ALL DAY ===
+    if (/\ball\s*day\b/i.test(input)) {
+        allDay = true
+        start.setHours(0, 0, 0, 0)
+    }
+
+    // === EXTRACT CLEAN TITLE ===
     title = input
-        .replace(/\b(tomorrow|today|next week|this afternoon|this evening)\b/gi, "")
+        .replace(/\b(tomorrow|today|next week|this morning|this afternoon|this evening|this night)\b/gi, "")
+        .replace(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi, "")
+        .replace(/\b(morning|afternoon|evening|night)\b/gi, "")
         .replace(/\b(at\s+)?\d{1,2}(:\d{2})?\s*(am|pm)?\b/gi, "")
-        .replace(/\b(for\s+)?\d+\s*(hour|hr|minute|min)s?\b/gi, "")
+        .replace(/\bfor\s+\d+\s*(hour|hr|minute|min)s?\b/gi, "")
+        .replace(/\ball\s*day\b/gi, "")
+        .replace(/\bevery\s+(day|week|month)\b/gi, "") // Remove recurrence for now
+        .replace(/\s+/g, " ")
         .trim()
 
     if (!title) title = input.slice(0, 50)
 
-    // Infer type
+    // Capitalize first letter
+    title = title.charAt(0).toUpperCase() + title.slice(1)
+
+    // === INFER TYPE ===
     const type = inferEventType(input)
+
+    // === INFER ENERGY COST ===
+    let energyCost = 3
+    if (type === "MEETING") energyCost = 3
+    if (type === "FOCUS") energyCost = 4
+    if (type === "HABIT") energyCost = 2
+    if (/\b(standup|sync|quick)\b/i.test(input)) energyCost = 2
+
+    // === BUILD EVENT ===
+    const end = allDay
+        ? new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+        : new Date(start.getTime() + durationMinutes * 60 * 1000)
+
+    // === SAFETY: Ensure start is in the future for "this" references ===
+    if (start <= now && /\bthis\b/i.test(input)) {
+        // If "this evening" but it's already past evening, set to tomorrow
+        start.setDate(start.getDate() + 1)
+    }
 
     const event: ParsedEventInput = {
         title,
         description: null,
         start,
-        end: new Date(start.getTime() + 60 * 60 * 1000),
-        allDay: false,
+        end,
+        allDay,
         location: null,
         type,
-        flexibility: 3,
-        energyCost: 3,
+        flexibility: type === "MEETING" ? 2 : 3,
+        energyCost,
         participants: extractParticipants(input)
     }
 

@@ -42,7 +42,7 @@ export type Event = {
   end: string | Date
   allDay: boolean
   location?: string | null
-  source: "MANUAL" | "GOOGLE" | "NOTION" | "TODOIST" | "SLACK"
+  source: "MANUAL"
   externalId?: string | null
   type: string
   energyCost: number

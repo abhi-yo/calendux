@@ -56,12 +56,23 @@ export function QuickAddInput({ onCreateEvent, open: controlledOpen, onOpenChang
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Open with "/" or Cmd+K
-            if ((e.key === "/" || (e.key === "k" && (e.metaKey || e.ctrlKey))) && !open) {
+            const isCmdK = (e.metaKey || e.ctrlKey) && e.key === "k"
+            const isSlash = e.key === "/"
+
+            if ((isSlash || isCmdK) && !open) {
                 const target = e.target as HTMLElement
-                if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
-                    e.preventDefault()
-                    setOpen(true)
+                const isInput = target.tagName === "INPUT" ||
+                    target.tagName === "TEXTAREA" ||
+                    target.isContentEditable
+
+                // Only block "/" when typing in an input
+                // Cmd+K/Ctrl+K should work everywhere
+                if (isSlash && isInput) {
+                    return
                 }
+
+                e.preventDefault()
+                setOpen(true)
             }
             // Close with Escape
             if (e.key === "Escape" && open) {
