@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { userId } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -38,18 +38,18 @@ export async function PUT(
 ) {
   try {
     const { userId } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const { id } = await params
     const body = await request.json()
-    const { 
-      title, 
-      description, 
-      start, 
-      end, 
+    const {
+      title,
+      description,
+      start,
+      end,
       allDay,
       type,
       energyCost,
@@ -60,6 +60,18 @@ export async function PUT(
       notes,
     } = body
 
+    // Server-side validation: Ensure end is after start
+    if (start && end) {
+      const startDate = new Date(start)
+      let endDate = new Date(end)
+      if (endDate <= startDate) {
+        // Fix: Make sure end is at least 15 min after start
+        endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
+        // Modifying the body variable itself isn't enough, we must update the 'end' variable being used or just update the date object in the update call.
+        // Let's rely on the update call using 'startDate' and 'endDate' variables.
+      }
+    }
+
     // Ensure the event belongs to the user
     const existingEvent = await prisma.event.findFirst({
       where: { id, userId },
@@ -69,13 +81,21 @@ export async function PUT(
       return NextResponse.json({ error: "Event not found" }, { status: 404 })
     }
 
+    // Recalculate dates if needed
+    let finalStart = start ? new Date(start) : undefined
+    let finalEnd = end ? new Date(end) : undefined
+
+    if (finalStart && finalEnd && finalEnd <= finalStart) {
+      finalEnd = new Date(finalStart.getTime() + 60 * 60 * 1000)
+    }
+
     const event = await prisma.event.update({
       where: { id },
       data: {
         ...(title && { title }),
         ...(description !== undefined && { description }),
-        ...(start && { start: new Date(start) }),
-        ...(end && { end: new Date(end) }),
+        ...(finalStart && { start: finalStart }),
+        ...(finalEnd && { end: finalEnd }),
         ...(allDay !== undefined && { allDay }),
         ...(type && { type }),
         ...(energyCost && { energyCost }),
@@ -101,7 +121,7 @@ export async function DELETE(
 ) {
   try {
     const { userId } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }

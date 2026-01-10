@@ -324,7 +324,13 @@ export function WeeklyCalendar() {
   const handleCreateEvent = async (formData: any) => {
     try {
       const startDate = new Date(`${formData.date}T${formData.start}`)
-      const endDate = new Date(`${formData.date}T${formData.end}`)
+      let endDate = new Date(`${formData.date}T${formData.end}`)
+
+      // Handle overnight events
+      if (endDate < startDate) {
+        endDate.setDate(endDate.getDate() + 1)
+      }
+
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -350,7 +356,13 @@ export function WeeklyCalendar() {
     if (!editingEvent?.id) return
     try {
       const startDate = new Date(`${formData.date}T${formData.start}`)
-      const endDate = new Date(`${formData.date}T${formData.end}`)
+      let endDate = new Date(`${formData.date}T${formData.end}`)
+
+      // Handle overnight events (if end time is before start time, it means next day)
+      if (endDate < startDate) {
+        endDate.setDate(endDate.getDate() + 1)
+      }
+
       const res = await fetch(`/api/events/${editingEvent.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

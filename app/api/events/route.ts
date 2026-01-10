@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   try {
     const { userId } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { userId } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -64,11 +64,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { 
-      title, 
-      description, 
-      start, 
-      end, 
+    const {
+      title,
+      description,
+      start,
+      end,
       allDay,
       type,
       energyCost,
@@ -83,12 +83,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    let startDate = new Date(start)
+    let endDate = new Date(end)
+
+    // Server-side validation: Ensure end is after start
+    if (endDate <= startDate) {
+      endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
+    }
+
     const event = await prisma.event.create({
       data: {
         title,
         description: description || null,
-        start: new Date(start),
-        end: new Date(end),
+        start: startDate,
+        end: endDate,
         allDay: allDay || false,
         type: type || "TASK",
         energyCost: energyCost || 3,
