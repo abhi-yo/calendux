@@ -28,10 +28,10 @@ export type Event = {
 
 // Energy thresholds
 export const ENERGY_THRESHOLDS = {
-  LOW: 8,      // Total daily energy under this is light
-  MEDIUM: 15,  // Under this is moderate
-  HIGH: 22,    // Under this is heavy
-  BURNOUT: 30, // Above this is burnout risk
+  LOW: 15,     // Total daily energy under this is light
+  MEDIUM: 30,  // Under this is moderate
+  HIGH: 60,    // Under this is heavy
+  BURNOUT: 85, // Above this is burnout risk
 }
 
 // Time of day energy multipliers (cognitive load is higher at certain times)
@@ -71,8 +71,7 @@ export interface CausalChain {
  */
 export function calculateEventLoad(event: Event): number {
   const durationMs = new Date(event.end).getTime() - new Date(event.start).getTime()
-  // Use Math.abs or Math.max to prevent negative duration if dates are flipped
-  const durationHours = Math.abs(durationMs) / (1000 * 60 * 60)
+  const durationHours = Math.max(0, durationMs) / (1000 * 60 * 60)
 
   const startHour = new Date(event.start).getHours()
   const timeMultiplier = TIME_MULTIPLIERS[startHour] || 1
