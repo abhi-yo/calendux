@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState, useEffect } from "react"
-import { Bell, Clock, Moon, Sun, Save, Check } from "lucide-react"
+import { Bell, Clock, Moon, Sun, Save, Check, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -14,6 +14,9 @@ interface UserPreferences {
     enableNotifications: boolean
     notifyBefore: number // minutes
     theme: string
+    useAI?: boolean
+    aiProvider?: string
+    apiKey?: string
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -23,6 +26,9 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     enableNotifications: true,
     notifyBefore: 15,
     theme: "system",
+    useAI: false,
+    apiKey: "",
+    aiProvider: "openai"
 }
 
 const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
@@ -51,13 +57,25 @@ export function PreferencesPanel({ onSave }: PreferencesPanelProps) {
     useEffect(() => {
         // Load preferences from localStorage or API
         const stored = localStorage.getItem("calendux_preferences")
+        const storedKey = localStorage.getItem("calendux_openai_key")
+        const storedProvider = localStorage.getItem("calendux_ai_provider")
+        const storedUseAI = localStorage.getItem("calendux_use_ai")
+
+        let initialPrefs = DEFAULT_PREFERENCES
         if (stored) {
             try {
-                setPreferences(JSON.parse(stored))
+                initialPrefs = { ...initialPrefs, ...JSON.parse(stored) }
             } catch {
                 // Use defaults
             }
         }
+
+        // Load AI settings separately
+        if (storedKey) initialPrefs.apiKey = storedKey
+        if (storedProvider) initialPrefs.aiProvider = storedProvider
+        if (storedUseAI) initialPrefs.useAI = storedUseAI === "true"
+
+        setPreferences(initialPrefs)
 
         // Check notification permission
         if ("Notification" in window) {
@@ -68,14 +86,22 @@ export function PreferencesPanel({ onSave }: PreferencesPanelProps) {
     const handleSave = async () => {
         setSaving(true)
         try {
-            // Save to localStorage
-            localStorage.setItem("calendux_preferences", JSON.stringify(preferences))
+            // Seprate server-safe prefs from local-only secrets
+            const { apiKey, aiProvider, useAI, ...serverPrefs } = preferences
 
-            // Also save to server
+            // Save standard prefs to localStorage object
+            localStorage.setItem("calendux_preferences", JSON.stringify(serverPrefs))
+
+            // Save AI settings to individual keys for WeeklyCalendar access
+            if (apiKey) localStorage.setItem("calendux_openai_key", apiKey) // Legacy key name for compatibility
+            if (aiProvider) localStorage.setItem("calendux_ai_provider", aiProvider)
+            if (useAI !== undefined) localStorage.setItem("calendux_use_ai", String(useAI))
+
+            // Also save logic to server (excluding key!)
             await fetch("/api/user", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ preferences }),
+                body: JSON.stringify({ preferences: serverPrefs }),
             })
 
             setSaved(true)
@@ -225,6 +251,80 @@ export function PreferencesPanel({ onSave }: PreferencesPanelProps) {
                                 </select>
                             </div>
                         )}
+                    </div>
+                )}
+            </div>
+
+            {/* AI Configuration */}
+            <div className="p-5 rounded-xl border border-border bg-card shadow-sm">
+                <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border/50">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                        <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-foreground">Intelligence Engine</h3>
+                        <p className="text-xs text-muted-foreground">Configure the AI model used for schedule optimization</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between mb-6">
+                    <div className="space-y-1">
+                        <p className="font-medium text-sm">Enable AI Optimization</p>
+                        <p className="text-xs text-muted-foreground max-w-[280px]">
+                            Use advanced LLMs to reorganize your calendar. Requires your own API key.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => updatePreference("useAI", !preferences.useAI)}
+                        className={cn(
+                            "relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            preferences.useAI ? "bg-primary" : "bg-muted"
+                        )}
+                        role="switch"
+                        aria-checked={preferences.useAI}
+                    >
+                        <span className={cn(
+                            "absolute top-1 left-1 w-4 h-4 rounded-full bg-background shadow-sm transition-transform duration-200",
+                            preferences.useAI && "translate-x-5"
+                        )} />
+                    </button>
+                </div>
+
+                {preferences.useAI && (
+                    <div className="space-y-5 animate-in slide-in-from-top-2 duration-200 fade-in-0">
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                AI Provider
+                            </label>
+                            <select
+                                value={preferences.aiProvider || "openai"}
+                                onChange={(e) => updatePreference("aiProvider", e.target.value)}
+                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="openai">OpenAI (GPT-5.2)</option>
+                                <option value="google">Google (Gemini 3 Flash)</option>
+                            </select>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                {preferences.aiProvider === 'google' ? 'Google API Key' : 'OpenAI API Key'}
+                            </label>
+                            <input
+                                type="password"
+                                value={preferences.apiKey || ""}
+                                onChange={(e) => updatePreference("apiKey", e.target.value)}
+                                placeholder={
+                                    preferences.aiProvider === 'google' ? 'AIza...' :
+                                        'sk-...'
+                                }
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                            />
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500/50"></span>
+                                Keys are stored locally in your browser and never saved to our servers.
+                            </p>
+                        </div>
                     </div>
                 )}
             </div>

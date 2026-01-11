@@ -293,9 +293,19 @@ export function WeeklyCalendar() {
   const handleOptimize = async () => {
     setOptimizing(true)
     try {
+      const storedKey = localStorage.getItem("calendux_openai_key")
+      const storedProvider = localStorage.getItem("calendux_ai_provider")
+      const useAI = localStorage.getItem("calendux_use_ai") === "true"
+
       const res = await fetch("/api/optimize/ai", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(useAI && storedKey ? {
+            "x-openai-key": storedKey,
+            "x-ai-provider": storedProvider || "openai"
+          } : {})
+        },
         body: JSON.stringify({ weekStart: weekStart.toISOString() })
       })
       if (res.ok) {
