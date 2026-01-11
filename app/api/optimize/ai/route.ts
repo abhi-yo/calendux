@@ -36,9 +36,12 @@ export async function POST(req: Request) {
       })
     }
 
-    // 2. Run Local Optimizer (no API key needed!)
-    // Pass startDate so optimizer knows the correct week range (detects empty early days)
-    const result = await rewriteEngine.optimizeSchedule(events, undefined, startDate)
+    // 2. Run Optimizer (Local or AI)
+    const apiKey = req.headers.get("x-openai-key") || undefined // Keeping legacy name for now to avoid client-side breaking if variable names linger
+    const aiProvider = req.headers.get("x-ai-provider") || "openai"
+
+    // logic to determine whether to use AI or local is handled inside optimizeSchedule based on apiKey presence
+    const result = await rewriteEngine.optimizeSchedule(events, undefined, startDate, apiKey, aiProvider)
 
     // 3. Apply changes to database if any events were moved
     if (result.changes.length > 0) {

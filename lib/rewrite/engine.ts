@@ -16,12 +16,20 @@ export type OptimizedSchedule = {
  */
 export class RewriteEngine {
 
-    async optimizeSchedule(events: Event[], conflicts?: Conflict[], weekStart?: Date): Promise<OptimizedSchedule> {
-        console.log(`[RewriteEngine] Starting local optimization for ${events.length} events`)
+    async optimizeSchedule(events: Event[], conflicts?: Conflict[], weekStart?: Date, apiKey?: string, aiProvider?: string): Promise<OptimizedSchedule> {
+        console.log(`[RewriteEngine] Starting optimization for ${events.length} events. Mode: ${apiKey ? "AI (" + aiProvider + ")" : "Local"}`)
 
         try {
-            // Run local optimizer
-            const result = localOptimizer.optimize(events, weekStart)
+            let result: OptimizationResult;
+
+            if (apiKey) {
+                // Multi-LLM Optimization
+                const { aiOptimizer } = await import("@/lib/optimizer/ai")
+                result = await aiOptimizer.optimize(events, apiKey, aiProvider || "openai", weekStart)
+            } else {
+                // Local Optimization
+                result = localOptimizer.optimize(events, weekStart)
+            }
 
             // Generate explanation
             let explanation = ""
