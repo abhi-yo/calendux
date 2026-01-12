@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
 import {
     CalendarBlank,
@@ -8,6 +9,12 @@ import {
     ShieldCheck,
     ArrowRight
 } from "@phosphor-icons/react"
+
+// Dynamic import to avoid SSR issues with Three.js
+const PixelBlast = dynamic(() => import("@/components/PixelBlast"), {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-[#08080a]" />
+})
 
 export function LandingPage() {
     return (
@@ -53,8 +60,29 @@ export function LandingPage() {
             {/* Main Content */}
             <main className="relative z-10">
                 {/* Hero */}
-                <section className="min-h-screen flex flex-col items-center justify-center px-6">
-                    <div className="max-w-3xl mx-auto text-center">
+                <section className="min-h-screen flex flex-col items-center justify-center px-6 relative">
+                    {/* PixelBlast Background - Only on edges, not behind content */}
+                    <div
+                        className="absolute inset-0 z-0"
+                        style={{
+                            maskImage: 'radial-gradient(ellipse 60% 50% at 50% 50%, transparent 0%, transparent 40%, rgba(0,0,0,0.1) 55%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0.7) 85%, black 100%)',
+                            WebkitMaskImage: 'radial-gradient(ellipse 60% 50% at 50% 50%, transparent 0%, transparent 40%, rgba(0,0,0,0.1) 55%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0.7) 85%, black 100%)',
+                        }}
+                    >
+                        <PixelBlast
+                            color="#6b5a96"
+                            pixelSize={4}
+                            patternScale={2.5}
+                            patternDensity={0.85}
+                            edgeFade={0.3}
+                            enableRipples={true}
+                            rippleIntensityScale={1.2}
+                            rippleThickness={0.12}
+                            rippleSpeed={0.35}
+                            speed={0.4}
+                        />
+                    </div>
+                    <div className="max-w-3xl mx-auto text-center relative z-10">
                         {/* Main Headline - word by word */}
                         <h1 className="mb-6">
                             <span className="block text-[4.5rem] md:text-[6rem] leading-[0.95] tracking-[-0.03em] text-white"
@@ -151,7 +179,9 @@ export function LandingPage() {
                 </section>
 
                 {/* Features - WITH slanted lines */}
-                <section className="relative py-32 border-t border-white/[0.06]">
+                <section className="relative py-32">
+                    {/* Top border with margin */}
+                    <div className="absolute top-0 left-20 right-20 h-px bg-white/[0.06]" />
                     {/* Left slanted lines */}
                     <div className="absolute left-0 top-0 bottom-0 w-20 pointer-events-none opacity-[0.06]"
                         style={{
@@ -235,7 +265,9 @@ export function LandingPage() {
                 </section>
 
                 {/* Stats - WITH slanted lines */}
-                <section className="relative py-24 border-t border-white/[0.06]">
+                <section className="relative py-24">
+                    {/* Top border with margin */}
+                    <div className="absolute top-0 left-20 right-20 h-px bg-white/[0.06]" />
                     {/* Left slanted lines */}
                     <div className="absolute left-0 top-0 bottom-0 w-20 pointer-events-none opacity-[0.06]"
                         style={{
