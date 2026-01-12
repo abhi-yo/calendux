@@ -34,7 +34,7 @@ export function TimezoneSettings() {
           setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)
         }
       })
-      .catch(err => console.error(err))
+      .catch(() => { })
       .finally(() => setLoading(false))
   }, [])
 
@@ -46,7 +46,7 @@ export function TimezoneSettings() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timezone }),
       })
-      
+
       if (res.ok) {
         // Show success (using window.alert as fallback if no toast lib)
         alert("Timezone updated successfully")
@@ -54,7 +54,7 @@ export function TimezoneSettings() {
         throw new Error("Failed to save")
       }
     } catch (error) {
-      console.error(error)
+
       alert("Failed to update timezone")
     } finally {
       setSaving(false)

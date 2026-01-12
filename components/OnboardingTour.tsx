@@ -99,7 +99,7 @@ export function OnboardingTour() {
                     }
                 }
             } catch (error) {
-                console.error("Failed to check onboarding status:", error)
+
                 // Fallback to localStorage
                 const completed = localStorage.getItem(ONBOARDING_KEY)
                 if (!completed) {
@@ -122,7 +122,7 @@ export function OnboardingTour() {
                 body: JSON.stringify({ onboardingCompleted: true })
             })
         } catch (error) {
-            console.error("Failed to save onboarding status:", error)
+
         }
         // Also save to localStorage as fallback
         localStorage.setItem(ONBOARDING_KEY, "true")
@@ -251,10 +251,10 @@ export function OnboardingTour() {
                                                 whileHover={{ scale: 1.2 }}
                                                 whileTap={{ scale: 0.9 }}
                                                 className={`h-2 rounded-full transition-all duration-300 ${i === currentStep
-                                                        ? `w-8 bg-gradient-to-r ${step.gradient}`
-                                                        : i < currentStep
-                                                            ? "w-2 bg-primary/50"
-                                                            : "w-2 bg-muted-foreground/30"
+                                                    ? `w-8 bg-gradient-to-r ${step.gradient}`
+                                                    : i < currentStep
+                                                        ? "w-2 bg-primary/50"
+                                                        : "w-2 bg-muted-foreground/30"
                                                     }`}
                                             />
                                         ))}
@@ -318,7 +318,7 @@ export function useResetOnboarding() {
                 body: JSON.stringify({ onboardingCompleted: false })
             })
         } catch (error) {
-            console.error("Failed to reset onboarding in database:", error)
+
         }
 
         window.location.reload()

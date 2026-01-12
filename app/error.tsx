@@ -13,7 +13,7 @@ export default function Error({
 }) {
     useEffect(() => {
         // Log to error reporting service in production
-        console.error("Application error:", error)
+
     }, [error])
 
     return (

@@ -41,22 +41,22 @@ export function SmartOptimizeDialog({ open, onOpenChange, weekStart, onApply }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ weekStart: weekStart.toISOString() }),
       })
-      
+
       if (res.ok) {
         const optimized = await res.json()
         setProposedSchedule(optimized)
-        
+
         // precise diff of moved events would be complex without full state access
         // For this demo, we'll simulate the "changes" list from the response if we had original vs new
         // Ideally the API returns the diff. 
         // Let's simplified assumption: The API returns the FULL list. 
         // We can't easily diff safely without the original list passed in props.
         // So we'll trust the user to "Apply".
-        
-        setChanges([{ title: "Schedule Analysis Complete", from: "Unbalanced", to: "Optimized" }]) 
+
+        setChanges([{ title: "Schedule Analysis Complete", from: "Unbalanced", to: "Optimized" }])
       }
     } catch (error) {
-      console.error(error)
+
       toast.error("Optimization failed")
     } finally {
       setLoading(false)
@@ -72,22 +72,22 @@ export function SmartOptimizeDialog({ open, onOpenChange, weekStart, onApply }: 
       // Here we loop for simplicity of implementation
       for (const event of proposedSchedule) {
         await fetch(`/api/events/${event.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                start: event.start,
-                end: event.end
-            })
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            start: event.start,
+            end: event.end
+          })
         })
       }
       toast.success("Schedule optimized!")
       onApply()
       onOpenChange(false)
     } catch (error) {
-        toast.error("Failed to apply changes")
+      toast.error("Failed to apply changes")
     } finally {
-        setLoading(false)
-        setProposedSchedule(null)
+      setLoading(false)
+      setProposedSchedule(null)
     }
   }
 
@@ -119,16 +119,16 @@ export function SmartOptimizeDialog({ open, onOpenChange, weekStart, onApply }: 
             </div>
           ) : proposedSchedule ? (
             <div className="space-y-4">
-               <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-between">
-                  <div>
-                      <p className="font-medium">Optimization Ready</p>
-                      <p className="text-sm text-muted-foreground">Found a more balanced schedule configuration.</p>
-                  </div>
-                  <Check className="h-5 w-5 text-green-500" />
-               </div>
-               <p className="text-xs text-muted-foreground text-center">
-                   Moves flexible tasks from Heavy days to Lighter days.
-               </p>
+              <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Optimization Ready</p>
+                  <p className="text-sm text-muted-foreground">Found a more balanced schedule configuration.</p>
+                </div>
+                <Check className="h-5 w-5 text-green-500" />
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Moves flexible tasks from Heavy days to Lighter days.
+              </p>
             </div>
           ) : null}
         </div>

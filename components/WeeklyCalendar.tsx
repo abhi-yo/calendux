@@ -227,7 +227,7 @@ export function WeeklyCalendar() {
         setEvents(await res.json())
       }
     } catch (error) {
-      console.error("Failed to fetch events:", error)
+
     }
   }, [weekStart.toISOString(), weekEnd.toISOString()])
 
@@ -238,7 +238,7 @@ export function WeeklyCalendar() {
         setInsights(await res.json())
       }
     } catch (error) {
-      console.error("Failed to fetch insights:", error)
+
     }
   }, [weekStart.toISOString()])
 
@@ -358,7 +358,7 @@ export function WeeklyCalendar() {
         await fetchInsights()
       }
     } catch (error) {
-      console.error("Failed to create event:", error)
+
     }
   }
 
