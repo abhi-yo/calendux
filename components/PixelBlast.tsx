@@ -111,13 +111,14 @@ const createLiquidEffect = (texture: THREE.Texture, opts?: { strength?: number; 
       uv += vec2(vx, vy) * amt;
     }
     `;
+    const uniformsMap = new Map<string, THREE.Uniform<unknown>>();
+    uniformsMap.set('uTexture', new THREE.Uniform(texture));
+    uniformsMap.set('uStrength', new THREE.Uniform(opts?.strength ?? 0.025));
+    uniformsMap.set('uTime', new THREE.Uniform(0));
+    uniformsMap.set('uFreq', new THREE.Uniform(opts?.freq ?? 4.5));
+
     return new Effect('LiquidEffect', fragment, {
-        uniforms: new Map([
-            ['uTexture', new THREE.Uniform(texture)],
-            ['uStrength', new THREE.Uniform(opts?.strength ?? 0.025)],
-            ['uTime', new THREE.Uniform(0)],
-            ['uFreq', new THREE.Uniform(opts?.freq ?? 4.5)]
-        ])
+        uniforms: uniformsMap
     });
 };
 
