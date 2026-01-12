@@ -27,7 +27,7 @@ export class AIOptimizer {
     ): Promise<OptimizationResult> {
         const scoreBefore = scoreSchedule(events)
 
-        console.log(`[AIOptimizer] Starting optimization with ${events.length} events using ${provider}`)
+
 
         // select model based on provider
         // select model based on provider
@@ -102,7 +102,7 @@ export class AIOptimizer {
             }
 
         } catch (error) {
-            console.error("[AIOptimizer] Error:", error)
+
             throw new Error("AI Optimization failed")
         }
     }

@@ -17,7 +17,7 @@ export type OptimizedSchedule = {
 export class RewriteEngine {
 
     async optimizeSchedule(events: Event[], conflicts?: Conflict[], weekStart?: Date, apiKey?: string, aiProvider?: string): Promise<OptimizedSchedule> {
-        console.log(`[RewriteEngine] Starting optimization for ${events.length} events. Mode: ${apiKey ? "AI (" + aiProvider + ")" : "Local"}`)
+
 
         try {
             let result: OptimizationResult;
@@ -51,7 +51,7 @@ export class RewriteEngine {
             }
 
         } catch (error) {
-            console.error("[RewriteEngine] Optimization failed:", error)
+
             return {
                 optimizedEvents: events,
                 changes: [],

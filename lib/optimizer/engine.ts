@@ -58,7 +58,7 @@ export class LocalOptimizer {
     let optimized = [...events]
     const changes: string[] = []
 
-    console.log(`[LocalOptimizer] Starting. ${events.length} events, initial score: ${scoreBefore.toFixed(1)}`)
+
 
     // Get today at midnight - never move to past
     const today = new Date()
@@ -85,7 +85,7 @@ export class LocalOptimizer {
 
     // Ensure strict midnight
     weekStart.setHours(0, 0, 0, 0)
-    console.log(`[LocalOptimizer] Optimizing week starting: ${weekStart.toDateString()}`)
+
 
     // Create entries for ALL 7 days (including empty ones!)
     for (let i = 0; i < 7; i++) {
@@ -112,10 +112,10 @@ export class LocalOptimizer {
       .map(([key, data]) => ({ key, ...data }))
       .sort((a, b) => b.load - a.load)
 
-    console.log(`[LocalOptimizer] Day loads:`, days.map(d => `${d.key.slice(0, 10)}: ${d.load}`))
+
 
     if (days.length < 2) {
-      console.log(`[LocalOptimizer] Not enough days to optimize`)
+
       return this.createResult(events, optimized, changes, scoreBefore)
     }
 
@@ -136,16 +136,16 @@ export class LocalOptimizer {
     const lightestDay = futureDays.pop()
 
     if (!lightestDay) {
-      console.log(`[LocalOptimizer] No future light days available. Today: ${todayStr}, Checked: ${days.map(d => d.date.toISOString().split('T')[0]).join(', ')}`)
+
       return this.createResult(events, optimized, changes, scoreBefore)
     }
 
     // Only balance if there's significant imbalance
     const loadDiff = heaviestDay.load - lightestDay.load
-    console.log(`[LocalOptimizer] Heaviest: ${heaviestDay.key} (${heaviestDay.load}), Lightest: ${lightestDay.key} (${lightestDay.load}), Diff: ${loadDiff}`)
+
 
     if (loadDiff < 3) {
-      console.log(`[LocalOptimizer] Schedule already balanced (diff < 3)`)
+
       return this.createResult(events, optimized, changes, scoreBefore)
     }
 
@@ -154,10 +154,10 @@ export class LocalOptimizer {
       .filter(isMovable)
       .sort((a, b) => (b.flexibility || 1) - (a.flexibility || 1)) // Most flexible first
 
-    console.log(`[LocalOptimizer] Found ${movableEvents.length} movable events on heaviest day`)
+
 
     if (movableEvents.length === 0) {
-      console.log(`[LocalOptimizer] No movable events on heaviest day`)
+
       return this.createResult(events, optimized, changes, scoreBefore)
     }
 
@@ -181,7 +181,7 @@ export class LocalOptimizer {
 
       const changeMsg = `Moved "${event.title}" from ${this.formatDay(heaviestDay.date)} to ${this.formatDay(lightestDay.date)}`
       changes.push(changeMsg)
-      console.log(`[LocalOptimizer] ${changeMsg}`)
+
     }
 
     return this.createResult(events, optimized, changes, scoreBefore)
@@ -189,7 +189,7 @@ export class LocalOptimizer {
 
   private createResult(original: Event[], optimized: Event[], changes: string[], scoreBefore: number): OptimizationResult {
     const scoreAfter = scoreSchedule(optimized)
-    console.log(`[LocalOptimizer] Done. ${changes.length} changes. Score: ${scoreBefore.toFixed(1)} → ${scoreAfter.toFixed(1)}`)
+
 
     return {
       events: optimized,

@@ -58,7 +58,7 @@ export async function parseNaturalLanguageEvent(
     }
 
     if (!process.env.OPENAI_API_KEY) {
-        console.warn("OPENAI_API_KEY not found, using basic parsing fallback")
+
         return parseWithFallback(input)
     }
 
@@ -117,7 +117,7 @@ export async function parseNaturalLanguageEvent(
         }
 
     } catch (error) {
-        console.error("LLM Parsing Failed:", error)
+
         return parseWithFallback(input)
     }
 }
@@ -314,7 +314,7 @@ function extractParticipants(input: string): string[] {
 
 export async function scoreEvent(event: Partial<Event>): Promise<EnergyScore> {
     if (!process.env.OPENAI_API_KEY) {
-        console.warn("OPENAI_API_KEY not found, returning default scores")
+
         return {
             energyCost: 3,
             cognitiveLoad: 3,
@@ -352,7 +352,7 @@ export async function scoreEvent(event: Partial<Event>): Promise<EnergyScore> {
         }
 
     } catch (error) {
-        console.error("LLM Scoring Failed:", error)
+
         return {
             energyCost: 3,
             cognitiveLoad: 3,
