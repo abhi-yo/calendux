@@ -7,18 +7,18 @@ import { startOfWeek, addDays } from "date-fns"
 export async function GET(request: Request) {
   try {
     const { userId } = await auth()
-    
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const weekStartParam = searchParams.get("weekStart")
-    
-    const weekStart = weekStartParam 
+
+    const weekStart = weekStartParam
       ? startOfWeek(new Date(weekStartParam), { weekStartsOn: 1 })
       : startOfWeek(new Date(), { weekStartsOn: 1 })
-    
+
     const weekEnd = addDays(weekStart, 7)
 
     // Fetch events for the week
@@ -33,17 +33,17 @@ export async function GET(request: Request) {
 
     // Generate insights
     const insights = generateWeekInsights(events, weekStart)
-    
+
     // Calculate daily loads
     const dailyLoads = []
     for (let i = 0; i < 7; i++) {
       const day = addDays(weekStart, i)
       dailyLoads.push(calculateDayLoad(events, day))
     }
-    
+
     // Get rescheduling suggestions
     const suggestions = suggestRescheduling(events, weekStart)
-    
+
     // Calculate week summary
     const totalEnergy = dailyLoads.reduce((sum, d) => sum + d.totalEnergy, 0)
     const burnoutRisk = dailyLoads.filter(d => d.status === "burnout").length > 0
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error("Error generating insights:", error)
+
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

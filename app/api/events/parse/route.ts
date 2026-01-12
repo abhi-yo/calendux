@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(result)
 
     } catch (error) {
-        console.error("[API] Parse event error:", error)
+
         return NextResponse.json(
             { success: false, error: "Failed to parse input", rawInput: "" },
             { status: 500 }

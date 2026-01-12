@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result)
 
   } catch (error) {
-    console.error("Optimize API Error:", error)
+
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
