@@ -27,9 +27,6 @@ export class AIOptimizer {
     ): Promise<OptimizationResult> {
         const scoreBefore = scoreSchedule(events)
 
-
-
-        // select model based on provider
         // select model based on provider
         let model;
         if (provider === 'google') {
