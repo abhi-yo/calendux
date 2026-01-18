@@ -46,7 +46,7 @@ export function LandingPage() {
                             Sign In
                         </a>
                         <a
-                            href="/sign-up"
+                            href="/sign-in"
                             className="px-4 py-1.5 text-xs font-medium text-black bg-white rounded-lg
                                        hover:bg-white/90 active:scale-[0.98] transition-all"
                             style={{ fontFamily: 'var(--font-inter)' }}
@@ -146,7 +146,7 @@ export function LandingPage() {
                             className="flex flex-col sm:flex-row items-center justify-center gap-3"
                         >
                             <a
-                                href="/sign-up"
+                                href="/sign-in"
                                 className="w-full sm:w-auto px-8 py-3.5 text-sm font-semibold text-[#08080a] bg-white rounded-lg
                                            hover:bg-gray-100 active:scale-[0.98] transition-all"
                                 style={{ fontFamily: 'var(--font-inter)' }}
@@ -331,7 +331,7 @@ export function LandingPage() {
                         Join thousands who&apos;ve transformed their productivity.
                     </p>
                     <a
-                        href="/sign-up"
+                        href="/sign-in"
                         className="inline-flex px-6 py-3 text-[13px] font-medium text-black bg-white rounded-lg
                                    hover:bg-white/90 active:scale-[0.98] transition-all"
                         style={{ fontFamily: 'var(--font-inter)' }}
@@ -348,7 +348,7 @@ export function LandingPage() {
                     <div className="flex items-center gap-6">
                         <a href="/sign-in" className="text-xs text-white/20 hover:text-white/50 transition-colors"
                             style={{ fontFamily: 'var(--font-inter)' }}>Sign In</a>
-                        <a href="/sign-up" className="text-xs text-white/20 hover:text-white/50 transition-colors"
+                        <a href="/sign-in" className="text-xs text-white/20 hover:text-white/50 transition-colors"
                             style={{ fontFamily: 'var(--font-inter)' }}>Sign Up</a>
                     </div>
                 </footer>
