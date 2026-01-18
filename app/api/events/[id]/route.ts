@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
 // GET a single event
@@ -8,12 +8,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
 
-    if (!userId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const userId = session.user.id
     const { id } = await params
 
     const event = await prisma.event.findFirst({
@@ -37,12 +38,13 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
 
-    if (!userId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const userId = session.user.id
     const { id } = await params
     const body = await request.json()
     const {
@@ -67,8 +69,6 @@ export async function PUT(
       if (endDate <= startDate) {
         // Fix: Make sure end is at least 15 min after start
         endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
-        // Modifying the body variable itself isn't enough, we must update the 'end' variable being used or just update the date object in the update call.
-        // Let's rely on the update call using 'startDate' and 'endDate' variables.
       }
     }
 
@@ -120,12 +120,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
 
-    if (!userId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const userId = session.user.id
     const { id } = await params
 
     // Ensure the event belongs to the user

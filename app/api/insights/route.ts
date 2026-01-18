@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { generateWeekInsights, calculateDayLoad, suggestRescheduling, ENERGY_THRESHOLDS } from "@/lib/intelligence"
 import { startOfWeek, addDays } from "date-fns"
 
 export async function GET(request: Request) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
 
-    if (!userId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     const { searchParams } = new URL(request.url)
     const weekStartParam = searchParams.get("weekStart")

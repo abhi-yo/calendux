@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
 export const dynamic = 'force-dynamic'
@@ -7,11 +7,13 @@ export const dynamic = 'force-dynamic'
 // GET all events for the current user
 export async function GET(request: Request) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
 
-    if (!userId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     const { searchParams } = new URL(request.url)
     const start = searchParams.get("start")
@@ -38,23 +40,24 @@ export async function GET(request: Request) {
 // POST create a new event
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth()
+    const session = await auth()
 
-    if (!userId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     // Ensure user exists in database
     let user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
       // Auto-create user if not exists
-      const { currentUser } = await import("@clerk/nextjs/server")
-      const clerkUser = await currentUser()
-      if (clerkUser?.emailAddresses?.[0]?.emailAddress) {
+      if (session.user.email) {
         user = await prisma.user.create({
           data: {
             id: userId,
-            email: clerkUser.emailAddresses[0].emailAddress,
+            email: session.user.email,
+            name: session.user.name || null,
             timezone: "UTC",
           },
         })

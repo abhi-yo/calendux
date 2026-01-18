@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { optimizeSchedule } from "@/lib/intelligence"
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) {
+  const session = await auth()
+
+  if (!session?.user?.id) {
     return new NextResponse("Unauthorized", { status: 401 })
   }
+
+  const userId = session.user.id
 
   try {
     const { weekStart } = await req.json()

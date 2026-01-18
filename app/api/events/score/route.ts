@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { scoreEvent } from "@/lib/llm/client"
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
-  
-  if (!userId) {
+  const session = await auth()
+
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -14,15 +14,15 @@ export async function POST(req: Request) {
     const { title, description, start, end } = body
 
     if (!title) {
-        return NextResponse.json({ error: "Title required" }, { status: 400 })
+      return NextResponse.json({ error: "Title required" }, { status: 400 })
     }
 
     // Call LLM
     const score = await scoreEvent({
-        title,
-        description,
-        start: start ? new Date(start) : new Date(),
-        end: end ? new Date(end) : new Date()
+      title,
+      description,
+      start: start ? new Date(start) : new Date(),
+      end: end ? new Date(end) : new Date()
     })
 
     return NextResponse.json(score)

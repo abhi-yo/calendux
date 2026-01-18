@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
 export type Tier = "FREE" | "PRO" | "TEAM"
@@ -10,7 +10,7 @@ export type Tier = "FREE" | "PRO" | "TEAM"
 export async function getUserTier(userId?: string): Promise<Tier> {
   if (!userId) {
     const session = await auth()
-    userId = session?.userId || undefined
+    userId = session?.user?.id || undefined
   }
 
   if (!userId) return "FREE"
@@ -20,7 +20,7 @@ export async function getUserTier(userId?: string): Promise<Tier> {
       where: { id: userId },
       select: { tier: true }
     })
-    
+
     // @ts-ignore - Prisma types might not represent the Enum correctly immediately after migration check
     return (user?.tier as Tier) || "FREE"
   } catch (error) {
@@ -34,13 +34,13 @@ export async function getUserTier(userId?: string): Promise<Tier> {
  */
 export async function checkFeatureAccess(feature: "ai_rewrite" | "unlimited_insights" | "integrations") {
   const tier = await getUserTier()
-  
+
   if (tier === "TEAM" || tier === "PRO") return true
-  
+
   // Free tier limits
   if (tier === "FREE") {
     return false
   }
-  
+
   return false
 }

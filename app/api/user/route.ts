@@ -1,14 +1,16 @@
 
 import { NextResponse } from "next/server"
-import { auth, currentUser } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
 export async function GET(req: Request) {
-  const { userId } = await auth()
+  const session = await auth()
 
-  if (!userId) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const userId = session.user.id
 
   try {
     const user = await prisma.user.findUnique({
@@ -16,15 +18,14 @@ export async function GET(req: Request) {
     })
 
     if (!user) {
-      // Create user if not exists (sync with Clerk)
-      const clerkUser = await currentUser()
-      if (clerkUser) {
+      // Create user if not exists
+      if (session.user.email) {
         const newUser = await prisma.user.create({
           data: {
             id: userId,
-            email: clerkUser.emailAddresses[0].emailAddress,
-            name: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim(),
-            timezone: "UTC" // Default
+            email: session.user.email,
+            name: session.user.name || null,
+            timezone: "UTC"
           }
         })
         return NextResponse.json(newUser)
@@ -40,11 +41,13 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { userId } = await auth()
+  const session = await auth()
 
-  if (!userId) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const userId = session.user.id
 
   try {
     const body = await req.json()
