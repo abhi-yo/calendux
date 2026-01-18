@@ -1,11 +1,11 @@
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth"
 import { Dashboard } from "@/components/Dashboard"
 import { LandingPage } from "@/components/LandingPage"
 
 export default async function Home() {
-  const { userId } = await auth()
+  const session = await auth()
 
-  if (!userId) {
+  if (!session?.user) {
     return <LandingPage />
   }
 

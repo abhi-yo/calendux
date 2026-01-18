@@ -11,7 +11,7 @@ import { TimezoneOnboarding } from "@/components/TimezoneOnboarding"
 import { OnboardingTour } from "@/components/OnboardingTour"
 import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp"
 import { QuickAddInput } from "@/components/QuickAddInput"
-import { UserButton } from "@clerk/nextjs"
+import { UserMenu } from "@/components/UserMenu"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
@@ -574,7 +574,7 @@ export function WeeklyCalendar() {
                 <Settings className="h-4 w-4" />
               </Button>
             </Link>
-            <UserButton afterSignOutUrl="/sign-in" />
+            <UserMenu />
           </div>
         </header>
 
