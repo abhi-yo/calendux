@@ -1,4 +1,4 @@
-import { Event } from "@/lib/intelligence"
+import { Event, generateWeekInsights } from "@/lib/intelligence"
 import { Conflict } from "@/lib/conflict/types"
 import { localOptimizer, OptimizationResult } from "@/lib/optimizer/engine"
 
@@ -18,7 +18,6 @@ export class RewriteEngine {
 
     async optimizeSchedule(events: Event[], conflicts?: Conflict[], weekStart?: Date, apiKey?: string, aiProvider?: string): Promise<OptimizedSchedule> {
 
-
         try {
             let result: OptimizationResult;
 
@@ -34,7 +33,16 @@ export class RewriteEngine {
             // Generate explanation
             let explanation = ""
             if (result.changes.length === 0) {
-                explanation = "Your schedule is already well-balanced! No changes needed."
+                // Check if there are still insights/suggestions
+                const insights = generateWeekInsights(events, weekStart || new Date())
+                const suggestions = insights.filter(i => i.type === "suggestion")
+                
+                if (suggestions.length > 0) {
+                    const suggestionTips = suggestions.map(s => s.suggestedAction).filter(Boolean).join("; ")
+                    explanation = `Your schedule is balanced across days, but consider: ${suggestionTips}`
+                } else {
+                    explanation = "Your schedule is already well-balanced! No changes needed."
+                }
             } else {
                 const improvement = result.scoreAfter - result.scoreBefore
                 explanation = `Made ${result.changes.length} optimization${result.changes.length > 1 ? 's' : ''}. ` +

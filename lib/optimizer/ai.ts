@@ -26,80 +26,110 @@ export class AIOptimizer {
         weekStartParam?: Date
     ): Promise<OptimizationResult> {
         const scoreBefore = scoreSchedule(events)
+        const now = new Date()
+        
+        // Tomorrow at midnight - minimum valid target date
+        const tomorrow = new Date(now)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        tomorrow.setHours(0, 0, 0, 0)
 
-        // select model based on provider
+        // Select model based on provider
         let model;
         if (provider === 'google') {
             const google = createGoogleGenerativeAI({ apiKey });
-            model = google('gemini-3-flash');
+            model = google('gemini-2.0-flash');
         } else {
             const openai = createOpenAI({ apiKey });
-            model = openai('gpt-5.2');
+            model = openai('gpt-4o');
         }
 
         // Filter and simplify events to save tokens
         const simplifiedEvents = events.map(e => ({
             id: e.id,
             title: e.title,
-            start: e.start,
-            end: e.end,
+            start: new Date(e.start).toISOString(),
+            end: new Date(e.end).toISOString(),
             type: e.type,
             energyCost: e.energyCost,
             flexibility: e.flexibility,
-            fixed: e.flexibility < 3 || e.causedById || this.isNonNegotiable(e)
+            fixed: e.flexibility < 2 || !!e.causedById || this.isNonNegotiable(e)
         }))
 
+        const currentDate = now.toISOString()
+        const minTargetDate = tomorrow.toISOString()
+
         const systemPrompt = `You are an expert calendar optimization AI. 
-        Your goal is to reschedule flexible events to maximize productivity and minimize burnout.
-        
-        Rules:
-        1. DO NOT move "fixed": true events.
-        2. DO NOT move events to the past (before today).
-        3. Balance daily energy load (sum of energyCost).
-        4. Group shallow tasks together and preserve deep work blocks.
-        
-        Return a JSON object with the moved events and a brief explanation.`
+Your goal is to reschedule flexible events to maximize productivity and minimize burnout.
+
+CRITICAL DATE RULES:
+- Current date/time: ${currentDate}
+- NEVER move events to dates before: ${minTargetDate}
+- Only move events that have "fixed": false
+- Events that have already started (start time < current time) CANNOT be moved
+
+Optimization Rules:
+1. Balance daily energy load (sum of energyCost) across days
+2. Aim for 15-20 total energyCost per day maximum
+3. Move events from overloaded days to lighter FUTURE days
+4. Group similar task types together when possible
+5. Preserve deep work blocks in morning/afternoon
+
+Return movedEvents array with NEW dates that are STRICTLY in the future (>= ${minTargetDate.split('T')[0]}).`
 
         try {
             const { object: result } = await generateObject({
                 model,
                 schema: OptimizationResultSchema,
                 system: systemPrompt,
-                prompt: `Current Schedule: ${JSON.stringify(simplifiedEvents)}`,
+                prompt: `Optimize this schedule. Today is ${now.toDateString()}. Only suggest moves to ${tomorrow.toDateString()} or later.\n\nEvents:\n${JSON.stringify(simplifiedEvents, null, 2)}`,
             })
 
             const movedEvents = result.movedEvents || []
 
-            // Apply changes
+            // STRICT VALIDATION: Filter out any moves to past dates
+            const validMoves = movedEvents.filter(move => {
+                const newStartDate = new Date(move.newStart)
+                // Must be tomorrow or later
+                return newStartDate >= tomorrow
+            })
+
+            // Apply only valid changes
             const optimizedEvents = events.map(originalEvent => {
-                const move = movedEvents.find((m) => m.id === originalEvent.id)
+                const move = validMoves.find((m) => m.id === originalEvent.id)
                 if (move) {
+                    const newStart = new Date(move.newStart)
+                    const newEnd = new Date(move.newEnd)
+                    
+                    // Double-check: skip if move is to the past
+                    if (newStart < tomorrow) {
+                        return originalEvent
+                    }
+                    
                     return {
                         ...originalEvent,
-                        start: new Date(move.newStart),
-                        end: new Date(move.newEnd)
+                        start: newStart,
+                        end: newEnd
                     }
                 }
                 return originalEvent
             })
 
             const scoreAfter = scoreSchedule(optimizedEvents)
-            const changes = movedEvents.map((m) => {
+            const changes = validMoves.map((m) => {
                 const event = events.find(e => e.id === m.id)
-                return `Moved "${event?.title}" to ${new Date(m.newStart).toLocaleDateString('en', { weekday: 'short' })}`
+                const newDate = new Date(m.newStart)
+                return `Moved "${event?.title}" to ${newDate.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })}`
             })
 
             return {
                 events: optimizedEvents,
-                changes: changes,
-                // If the score didn't improve or was invalid, rely on the AI's explanation or a default one
+                changes,
                 scoreBefore,
                 scoreAfter: Math.max(scoreAfter, scoreBefore),
                 breakdown: getScoreBreakdown(optimizedEvents)
             }
 
         } catch (error) {
-
             throw new Error("AI Optimization failed")
         }
     }

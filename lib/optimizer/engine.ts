@@ -50,6 +50,7 @@ function isMovable(event: Event): boolean {
 
 /**
  * Simple, aggressive optimizer that balances load across days.
+ * ONLY moves events to future dates, never to past.
  */
 export class LocalOptimizer {
 
@@ -58,11 +59,13 @@ export class LocalOptimizer {
     let optimized = [...events]
     const changes: string[] = []
 
-
-
-    // Get today at midnight - never move to past
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // Get current time - critical for determining what's in the past
+    const now = new Date()
+    
+    // Tomorrow at midnight - we only move events to tomorrow or later
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
 
     // Calculate load per day
     const dayLoads = new Map<string, { load: number; events: Event[]; date: Date }>()
@@ -72,22 +75,19 @@ export class LocalOptimizer {
     if (weekStartParam) {
       weekStart = new Date(weekStartParam)
     } else {
-      // Fallback: infer from events if no start date provided
       if (optimized.length > 0) {
         const eventDates = optimized.map(e => new Date(e.start))
         const minEventDate = new Date(Math.min(...eventDates.map(d => d.getTime())))
         weekStart = new Date(minEventDate)
         weekStart.setDate(weekStart.getDate() - weekStart.getDay())
       } else {
-        weekStart = new Date() // Default to now if no events
+        weekStart = new Date()
       }
     }
 
-    // Ensure strict midnight
     weekStart.setHours(0, 0, 0, 0)
 
-
-    // Create entries for ALL 7 days (including empty ones!)
+    // Create entries for ALL 7 days
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart)
       date.setDate(date.getDate() + i)
@@ -99,7 +99,6 @@ export class LocalOptimizer {
     for (const event of optimized) {
       const date = new Date(event.start)
       const dayKey = date.toDateString()
-
       const day = dayLoads.get(dayKey)
       if (day) {
         day.load += event.energyCost || 3
@@ -107,81 +106,71 @@ export class LocalOptimizer {
       }
     }
 
-    // Convert to array and sort by load (heaviest first)
-    const days = Array.from(dayLoads.entries())
+    // Convert to array
+    const allDays = Array.from(dayLoads.entries())
       .map(([key, data]) => ({ key, ...data }))
-      .sort((a, b) => b.load - a.load)
 
+    // STRICT: Only consider days that are TOMORROW or later as valid targets
+    const validTargetDays = allDays.filter(d => d.date >= tomorrow)
 
+    // Days that have overloaded events (could be today or future)
+    const overloadedDays = allDays.filter(d => d.load > 20)
 
-    if (days.length < 2) {
-
+    if (validTargetDays.length === 0 || overloadedDays.length === 0) {
       return this.createResult(events, optimized, changes, scoreBefore)
     }
 
-    // Find the heaviest and lightest days
-    const heaviestDay = days[0]
+    // Sort target days by load (lightest first for better distribution)
+    validTargetDays.sort((a, b) => a.load - b.load)
 
-    // Use string comparison for safety to avoid timezone subtlties
-    const todayStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    const OVERLOAD_THRESHOLD = 20
+    const TARGET_LOAD = 15
 
-    // Filter for future days (including today)
-    const futureDays = days.filter(d => {
-      const dayDate = new Date(d.date)
-      const dayStr = dayDate.toISOString().split('T')[0]
-      return dayStr >= todayStr
-    })
+    for (const heavyDay of overloadedDays) {
+      if (heavyDay.load <= OVERLOAD_THRESHOLD) continue
 
-    // Lightest is the last one (since sorted by load desc)
-    const lightestDay = futureDays.pop()
+      // Find movable events - must be flexible AND start in the future
+      const movableEvents = heavyDay.events
+        .filter(e => {
+          // Check if event is movable by flexibility rules
+          if (!isMovable(e)) return false
+          // STRICT: Event must start AFTER current time
+          const eventStart = new Date(e.start)
+          return eventStart > now
+        })
+        .sort((a, b) => (b.flexibility || 1) - (a.flexibility || 1))
 
-    if (!lightestDay) {
+      if (movableEvents.length === 0) continue
 
-      return this.createResult(events, optimized, changes, scoreBefore)
-    }
+      // Find lighter days to move events to - MUST be tomorrow or later
+      const lighterDays = validTargetDays
+        .filter(d => d.key !== heavyDay.key && d.load < TARGET_LOAD)
 
-    // Only balance if there's significant imbalance
-    const loadDiff = heaviestDay.load - lightestDay.load
+      if (lighterDays.length === 0) continue
 
+      // Move events to balance
+      for (const event of movableEvents) {
+        if (heavyDay.load <= TARGET_LOAD) break
 
-    if (loadDiff < 3) {
+        const eventCost = event.energyCost || 3
+        const targetDay = lighterDays.find(d => d.load + eventCost <= OVERLOAD_THRESHOLD)
 
-      return this.createResult(events, optimized, changes, scoreBefore)
-    }
+        if (!targetDay) continue
 
-    // Find movable events from heaviest day
-    const movableEvents = heaviestDay.events
-      .filter(isMovable)
-      .sort((a, b) => (b.flexibility || 1) - (a.flexibility || 1)) // Most flexible first
+        // Double-check target is in the future
+        if (targetDay.date < tomorrow) continue
 
+        // Move the event
+        optimized = this.moveEventToDay(optimized, event.id, targetDay.date)
+        heavyDay.load -= eventCost
+        targetDay.load += eventCost
 
+        const changeMsg = `Moved "${event.title}" from ${this.formatDay(heavyDay.date)} to ${this.formatDay(targetDay.date)}`
+        changes.push(changeMsg)
 
-    if (movableEvents.length === 0) {
-
-      return this.createResult(events, optimized, changes, scoreBefore)
-    }
-
-    // Move events until balanced or no more to move
-    let currentHeavyLoad = heaviestDay.load
-    let currentLightLoad = lightestDay.load
-
-    for (const event of movableEvents) {
-      const eventCost = event.energyCost || 3
-
-      // Stop if we've balanced enough
-      if (currentHeavyLoad - currentLightLoad < 3) break
-
-      // Don't overload the target day
-      if (currentLightLoad + eventCost > 25) continue
-
-      // Move the event
-      optimized = this.moveEventToDay(optimized, event.id, lightestDay.date)
-      currentHeavyLoad -= eventCost
-      currentLightLoad += eventCost
-
-      const changeMsg = `Moved "${event.title}" from ${this.formatDay(heaviestDay.date)} to ${this.formatDay(lightestDay.date)}`
-      changes.push(changeMsg)
-
+        // Re-sort lighter days
+        lighterDays.sort((a, b) => a.load - b.load)
+      }
     }
 
     return this.createResult(events, optimized, changes, scoreBefore)

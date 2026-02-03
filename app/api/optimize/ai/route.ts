@@ -5,7 +5,12 @@ import { rewriteEngine } from "@/lib/rewrite/engine"
 import { Event } from "@/lib/intelligence"
 
 export async function POST(req: Request) {
-  const session = await auth()
+  const sessionPromise = auth()
+  const bodyPromise = req.json()
+  const apiKey = req.headers.get("x-openai-key") || undefined
+  const aiProvider = req.headers.get("x-ai-provider") || "openai"
+  
+  const [session, body] = await Promise.all([sessionPromise, bodyPromise])
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -14,11 +19,7 @@ export async function POST(req: Request) {
   const userId = session.user.id
 
   try {
-    const body = await req.json()
     const weekStartStr = body.weekStart
-
-    // 1. Fetch user events for the requested week
-    // If no weekStart provided, default to "now" (legacy behavior protection)
     const startDate = weekStartStr ? new Date(weekStartStr) : new Date()
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + 7)
@@ -38,19 +39,12 @@ export async function POST(req: Request) {
       })
     }
 
-    // 2. Run Optimizer (Local or AI)
-    const apiKey = req.headers.get("x-openai-key") || undefined // Keeping legacy name for now to avoid client-side breaking if variable names linger
-    const aiProvider = req.headers.get("x-ai-provider") || "openai"
-
-    // logic to determine whether to use AI or local is handled inside optimizeSchedule based on apiKey presence
     const result = await rewriteEngine.optimizeSchedule(events, undefined, startDate, apiKey, aiProvider)
 
-    // 3. Apply changes to database if any events were moved
     if (result.changes.length > 0) {
       for (const optimizedEvent of result.optimizedEvents) {
         const originalEvent = events.find(e => e.id === optimizedEvent.id)
 
-        // Check if this event was actually moved
         if (originalEvent &&
           (new Date(originalEvent.start).getTime() !== new Date(optimizedEvent.start).getTime())) {
           await prisma.event.update({
@@ -67,7 +61,6 @@ export async function POST(req: Request) {
     return NextResponse.json(result)
 
   } catch (error) {
-
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

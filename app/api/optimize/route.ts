@@ -4,7 +4,10 @@ import { prisma } from "@/lib/db"
 import { optimizeSchedule } from "@/lib/intelligence"
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
+  const sessionPromise = auth()
+  const bodyPromise = req.json()
+  
+  const [session, body] = await Promise.all([sessionPromise, bodyPromise])
 
   if (!session?.user?.id) {
     return new NextResponse("Unauthorized", { status: 401 })
@@ -13,12 +16,11 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id
 
   try {
-    const { weekStart } = await req.json()
+    const { weekStart } = body
     const start = new Date(weekStart)
     const end = new Date(start)
     end.setDate(end.getDate() + 7)
 
-    // Fetch week's events
     const events = await prisma.event.findMany({
       where: {
         userId,
@@ -29,9 +31,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Run optimization
-    // @ts-ignore - mismatch between Prisma Event and our internal logic Event type (dates vs strings)
-    // We Map prisma dates to dates (they are Date objects already in runtime)
+    // @ts-ignore
     const optimized = optimizeSchedule(events as any, start)
 
     return NextResponse.json(optimized)

@@ -5,8 +5,18 @@ import { generateWeekInsights, calculateDayLoad, suggestRescheduling, ENERGY_THR
 import { startOfWeek, addDays } from "date-fns"
 
 export async function GET(request: Request) {
+  const sessionPromise = auth()
+  const { searchParams } = new URL(request.url)
+  const weekStartParam = searchParams.get("weekStart")
+
+  const weekStart = weekStartParam
+    ? startOfWeek(new Date(weekStartParam), { weekStartsOn: 1 })
+    : startOfWeek(new Date(), { weekStartsOn: 1 })
+
+  const weekEnd = addDays(weekStart, 7)
+  
   try {
-    const session = await auth()
+    const session = await sessionPromise
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -14,16 +24,6 @@ export async function GET(request: Request) {
 
     const userId = session.user.id
 
-    const { searchParams } = new URL(request.url)
-    const weekStartParam = searchParams.get("weekStart")
-
-    const weekStart = weekStartParam
-      ? startOfWeek(new Date(weekStartParam), { weekStartsOn: 1 })
-      : startOfWeek(new Date(), { weekStartsOn: 1 })
-
-    const weekEnd = addDays(weekStart, 7)
-
-    // Fetch events for the week
     const events = await prisma.event.findMany({
       where: {
         userId,

@@ -23,7 +23,7 @@ export type ParsedEventInput = {
     end: Date
     allDay: boolean
     location: string | null
-    type: "TASK" | "EVENT" | "MEETING" | "HABIT" | "FOCUS"
+    type: "TASK" | "MEETING" | "HABIT" | "FOCUS" | "BREAK" | "PERSONAL"
     flexibility: number
     energyCost: number
     participants: string[]
@@ -131,6 +131,7 @@ function parseWithFallback(input: string): ParseResult {
     let start = new Date(now)
     let title = input
     let allDay = false
+    let timeWasSet = false
 
     // === WEEKDAY PARSING ===
     const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
@@ -143,6 +144,7 @@ function parseWithFallback(input: string): ParseResult {
         start = new Date(now)
         start.setDate(now.getDate() + daysToAdd)
         start.setHours(9, 0, 0, 0) // Default to 9am
+        timeWasSet = true
     }
 
     // === RELATIVE DATE PARSING ===
@@ -150,6 +152,7 @@ function parseWithFallback(input: string): ParseResult {
         start = new Date(now)
         start.setDate(now.getDate() + 1)
         start.setHours(9, 0, 0, 0)
+        timeWasSet = true
     } else if (/\btoday\b/i.test(input)) {
         start = new Date(now)
         // Keep current time or set to next hour
@@ -157,19 +160,24 @@ function parseWithFallback(input: string): ParseResult {
         if (start <= now) {
             start.setHours(start.getHours() + 1)
         }
+        timeWasSet = true
     } else if (/\bnext week\b/i.test(input)) {
         start = new Date(now)
         start.setDate(now.getDate() + 7)
         start.setHours(9, 0, 0, 0)
+        timeWasSet = true
     }
 
     // === TIME OF DAY KEYWORDS ===
     if (/\b(this\s+)?morning\b/i.test(input)) {
         start.setHours(9, 0, 0, 0)
+        timeWasSet = true
     } else if (/\b(this\s+)?afternoon\b/i.test(input)) {
         start.setHours(14, 0, 0, 0)
+        timeWasSet = true
     } else if (/\b(this\s+)?evening\b/i.test(input)) {
         start.setHours(18, 0, 0, 0)
+        timeWasSet = true
         // If "this evening" and it's already past 6pm, leave as is
         if (/\bthis\s+evening\b/i.test(input) && !weekdayMatch && !/\btomorrow\b/i.test(input)) {
             const today = new Date(now)
@@ -180,6 +188,7 @@ function parseWithFallback(input: string): ParseResult {
         }
     } else if (/\bnight\b/i.test(input)) {
         start.setHours(20, 0, 0, 0)
+        timeWasSet = true
     }
 
     // === SPECIFIC TIME PARSING (overrides time of day) ===
@@ -200,6 +209,14 @@ function parseWithFallback(input: string): ParseResult {
         }
 
         start.setHours(hours, minutes, 0, 0)
+        timeWasSet = true
+    }
+
+    // === DEFAULT TIME: If no time was set, default to next hour ===
+    if (!timeWasSet) {
+        start = new Date(now)
+        start.setMinutes(0, 0, 0)
+        start.setHours(start.getHours() + 1)
     }
 
     // === DURATION PARSING ===
@@ -283,18 +300,20 @@ function parseWithFallback(input: string): ParseResult {
     }
 }
 
-function validateEventType(type: string): "TASK" | "EVENT" | "MEETING" | "HABIT" | "FOCUS" {
-    const validTypes = ["TASK", "EVENT", "MEETING", "HABIT", "FOCUS"]
-    return validTypes.includes(type) ? type as ParsedEventInput["type"] : "EVENT"
+function validateEventType(type: string): "TASK" | "MEETING" | "HABIT" | "FOCUS" | "BREAK" | "PERSONAL" {
+    const validTypes = ["TASK", "MEETING", "HABIT", "FOCUS", "BREAK", "PERSONAL"]
+    return validTypes.includes(type) ? type as "TASK" | "MEETING" | "HABIT" | "FOCUS" | "BREAK" | "PERSONAL" : "TASK"
 }
 
-function inferEventType(input: string): ParsedEventInput["type"] {
+function inferEventType(input: string): "TASK" | "MEETING" | "HABIT" | "FOCUS" | "BREAK" | "PERSONAL" {
     const lower = input.toLowerCase()
     if (/\b(meet|call|sync|1:1|standup|coffee|lunch with)\b/.test(lower)) return "MEETING"
     if (/\b(focus|deep work|coding|writing|work on)\b/.test(lower)) return "FOCUS"
     if (/\b(gym|workout|meditate|run|exercise|yoga)\b/.test(lower)) return "HABIT"
+    if (/\b(break|rest|relax|nap)\b/.test(lower)) return "BREAK"
+    if (/\b(personal|family|friend|birthday|anniversary)\b/.test(lower)) return "PERSONAL"
     if (/\b(deadline|due|submit|finish|complete)\b/.test(lower)) return "TASK"
-    return "EVENT"
+    return "TASK"
 }
 
 function extractParticipants(input: string): string[] {
