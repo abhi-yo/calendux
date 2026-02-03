@@ -4,10 +4,14 @@ import { prisma } from "@/lib/db"
 
 export const dynamic = 'force-dynamic'
 
-// GET all events for the current user
 export async function GET(request: Request) {
+  const sessionPromise = auth()
+  const { searchParams } = new URL(request.url)
+  const start = searchParams.get("start")
+  const end = searchParams.get("end")
+  
   try {
-    const session = await auth()
+    const session = await sessionPromise
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -15,16 +19,12 @@ export async function GET(request: Request) {
 
     const userId = session.user.id
 
-    const { searchParams } = new URL(request.url)
-    const start = searchParams.get("start")
-    const end = searchParams.get("end")
-
     const events = await prisma.event.findMany({
       where: {
         userId,
         ...(start && end ? {
-          start: { gte: new Date(start) },
-          end: { lte: new Date(end) },
+          start: { lt: new Date(end) },
+          end: { gt: new Date(start) },
         } : {}),
       },
       orderBy: { start: "asc" },
@@ -32,15 +32,16 @@ export async function GET(request: Request) {
 
     return NextResponse.json(events)
   } catch (error) {
-
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-// POST create a new event
 export async function POST(request: Request) {
+  const sessionPromise = auth()
+  const bodyPromise = request.json()
+  
   try {
-    const session = await auth()
+    const [session, body] = await Promise.all([sessionPromise, bodyPromise])
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -48,10 +49,8 @@ export async function POST(request: Request) {
 
     const userId = session.user.id
 
-    // Ensure user exists in database
     let user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
-      // Auto-create user if not exists
       if (session.user.email) {
         user = await prisma.user.create({
           data: {
@@ -66,7 +65,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const body = await request.json()
     const {
       title,
       description,
@@ -80,6 +78,7 @@ export async function POST(request: Request) {
       causedById,
       tags,
       notes,
+      location,
     } = body
 
     if (!title || !start || !end) {
@@ -89,7 +88,6 @@ export async function POST(request: Request) {
     let startDate = new Date(start)
     let endDate = new Date(end)
 
-    // Server-side validation: Ensure end is after start
     if (endDate <= startDate) {
       endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
     }
@@ -102,19 +100,20 @@ export async function POST(request: Request) {
         end: endDate,
         allDay: allDay || false,
         type: type || "TASK",
-        energyCost: energyCost || 3,
-        importance: importance || 3,
-        flexibility: flexibility || 3,
-        causedById: causedById || null,
+        source: "MANUAL",
+        energyCost: energyCost ?? 3,
+        importance: importance ?? 3,
+        flexibility: flexibility ?? 3,
+        causedById: causedById && causedById !== "none" ? causedById : null,
         tags: tags || [],
         notes: notes || null,
+        location: location || null,
         userId,
       },
     })
 
     return NextResponse.json(event, { status: 201 })
-  } catch (error) {
-
+  } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

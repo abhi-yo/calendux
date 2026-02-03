@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -18,7 +17,6 @@ export async function GET(req: Request) {
     })
 
     if (!user) {
-      // Create user if not exists
       if (session.user.email) {
         const newUser = await prisma.user.create({
           data: {
@@ -35,13 +33,15 @@ export async function GET(req: Request) {
 
     return NextResponse.json(user)
   } catch (error) {
-
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
 
 export async function PUT(req: Request) {
-  const session = await auth()
+  const sessionPromise = auth()
+  const bodyPromise = req.json()
+  
+  const [session, body] = await Promise.all([sessionPromise, bodyPromise])
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -50,15 +50,12 @@ export async function PUT(req: Request) {
   const userId = session.user.id
 
   try {
-    const body = await req.json()
     const { timezone, onboardingCompleted } = body
 
-    // Get existing user to preserve preferences
     const existingUser = await prisma.user.findUnique({
       where: { id: userId }
     })
 
-    // Build update data
     const updateData: Record<string, unknown> = {}
 
     if (timezone !== undefined) {
@@ -66,7 +63,6 @@ export async function PUT(req: Request) {
     }
 
     if (onboardingCompleted !== undefined) {
-      // Merge with existing preferences
       const currentPreferences = (existingUser?.preferences as Record<string, unknown>) || {}
       updateData.preferences = {
         ...currentPreferences,
@@ -81,7 +77,6 @@ export async function PUT(req: Request) {
 
     return NextResponse.json(user)
   } catch (error) {
-
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

@@ -2,23 +2,22 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
-// GET a single event
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionPromise = auth()
+  const paramsPromise = params
+  
   try {
-    const session = await auth()
+    const [session, { id }] = await Promise.all([sessionPromise, paramsPromise])
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const userId = session.user.id
-    const { id } = await params
-
     const event = await prisma.event.findFirst({
-      where: { id, userId },
+      where: { id, userId: session.user.id },
     })
 
     if (!event) {
@@ -27,26 +26,26 @@ export async function GET(
 
     return NextResponse.json(event)
   } catch (error) {
-
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-// PUT update an event
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionPromise = auth()
+  const paramsPromise = params
+  const bodyPromise = request.json()
+  
   try {
-    const session = await auth()
+    const [session, { id }, body] = await Promise.all([sessionPromise, paramsPromise, bodyPromise])
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = session.user.id
-    const { id } = await params
-    const body = await request.json()
     const {
       title,
       description,
@@ -62,17 +61,14 @@ export async function PUT(
       notes,
     } = body
 
-    // Server-side validation: Ensure end is after start
     if (start && end) {
       const startDate = new Date(start)
       let endDate = new Date(end)
       if (endDate <= startDate) {
-        // Fix: Make sure end is at least 15 min after start
         endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
       }
     }
 
-    // Ensure the event belongs to the user
     const existingEvent = await prisma.event.findFirst({
       where: { id, userId },
     })
@@ -82,12 +78,11 @@ export async function PUT(
     }
 
     // Recalculate dates if needed
-    let finalStart = start ? new Date(start) : undefined
-    let finalEnd = end ? new Date(end) : undefined
+    const finalStart = start ? new Date(start) : undefined
+    const finalEnd = end ? new Date(end) : undefined
 
-    if (finalStart && finalEnd && finalEnd <= finalStart) {
-      finalEnd = new Date(finalStart.getTime() + 60 * 60 * 1000)
-    }
+    // Handle causedById - convert empty string or "none" to null
+    const finalCausedById = causedById === "" || causedById === "none" ? null : causedById
 
     const event = await prisma.event.update({
       where: { id },
@@ -98,10 +93,10 @@ export async function PUT(
         ...(finalEnd && { end: finalEnd }),
         ...(allDay !== undefined && { allDay }),
         ...(type && { type }),
-        ...(energyCost && { energyCost }),
-        ...(importance && { importance }),
-        ...(flexibility && { flexibility }),
-        ...(causedById !== undefined && { causedById }),
+        ...(energyCost !== undefined && { energyCost: Number(energyCost) }),
+        ...(importance !== undefined && { importance: Number(importance) }),
+        ...(flexibility !== undefined && { flexibility: Number(flexibility) }),
+        ...(causedById !== undefined && { causedById: finalCausedById }),
         ...(tags && { tags }),
         ...(notes !== undefined && { notes }),
       },
@@ -109,29 +104,27 @@ export async function PUT(
 
     return NextResponse.json(event)
   } catch (error) {
-
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json({ error: "Internal server error", details: errorMessage }, { status: 500 })
   }
 }
 
-// DELETE an event
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionPromise = auth()
+  const paramsPromise = params
+  
   try {
-    const session = await auth()
+    const [session, { id }] = await Promise.all([sessionPromise, paramsPromise])
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const userId = session.user.id
-    const { id } = await params
-
-    // Ensure the event belongs to the user
     const existingEvent = await prisma.event.findFirst({
-      where: { id, userId },
+      where: { id, userId: session.user.id },
     })
 
     if (!existingEvent) {
@@ -144,7 +137,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
