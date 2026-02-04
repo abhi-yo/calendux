@@ -21,7 +21,6 @@ export default function SettingsPage() {
             <ChevronLeft className="h-4 w-4" />
             Back to Calendar
           </Link>
-          <h1 className="text-xl font-bold">Settings</h1>
         </div>
       </header>
 
