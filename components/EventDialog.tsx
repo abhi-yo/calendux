@@ -1,10 +1,18 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { format } from "date-fns"
-import { CalendarIcon, Plus, Zap, Clock, Shuffle, AlertTriangle, Repeat } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import * as React from "react";
+import { format } from "date-fns";
+import {
+  CalendarIcon,
+  Plus,
+  Zap,
+  Clock,
+  Shuffle,
+  AlertTriangle,
+  Repeat,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -13,21 +21,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 const EVENT_TYPES = [
   { value: "MEETING", label: "Meeting" },
@@ -36,7 +44,7 @@ const EVENT_TYPES = [
   { value: "FOCUS", label: "Focus" },
   { value: "BREAK", label: "Break" },
   { value: "PERSONAL", label: "Personal" },
-]
+];
 
 const RECURRENCE_OPTIONS = [
   { value: "none", label: "Does not repeat" },
@@ -44,42 +52,43 @@ const RECURRENCE_OPTIONS = [
   { value: "FREQ=WEEKLY", label: "Weekly" },
   { value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", label: "Weekdays" },
   { value: "FREQ=MONTHLY", label: "Monthly" },
-]
+];
 
 // Generate time options (every 15 minutes)
 const TIME_OPTIONS = Array.from({ length: 96 }, (_, i) => {
-  const hours = Math.floor(i / 4)
-  const minutes = (i % 4) * 15
-  const value = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
-  const label = format(new Date().setHours(hours, minutes), 'h:mm a')
-  return { value, label }
-})
+  const hours = Math.floor(i / 4);
+  const minutes = (i % 4) * 15;
+  const value = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  const label = format(new Date().setHours(hours, minutes), "h:mm a");
+  return { value, label };
+});
 
 interface EventFormData {
-  title: string
-  description?: string
-  start: string
-  end: string
-  date: string
-  type: string
-  energyCost: number
-  importance: number
-  flexibility: number
-  causedById?: string
-  notes?: string
-  isRecurring?: boolean
-  recurrenceRule?: string
+  id?: string;
+  title: string;
+  description?: string;
+  start: string;
+  end: string;
+  date: string;
+  type: string;
+  energyCost: number;
+  importance: number;
+  flexibility: number;
+  causedById?: string;
+  notes?: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
 }
 
 export interface EventDialogProps {
-  onCreate: (event: EventFormData) => void
-  onUpdate?: (event: EventFormData) => void
-  onDelete?: () => void
-  existingEvents?: { id: string; title: string }[]
-  trigger?: React.ReactNode
-  event?: EventFormData | null
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  onCreate: (event: EventFormData) => void;
+  onUpdate?: (event: EventFormData) => void;
+  onDelete?: () => void;
+  existingEvents?: { id: string; title: string }[];
+  trigger?: React.ReactNode;
+  event?: EventFormData | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function EventDialog({
@@ -90,19 +99,19 @@ export function EventDialog({
   trigger,
   event,
   open: controlledOpen,
-  onOpenChange: setControlledOpen
+  onOpenChange: setControlledOpen,
 }: EventDialogProps) {
-  const [internalOpen, setInternalOpen] = React.useState(false)
-  const isControlled = controlledOpen !== undefined
-  const open = isControlled ? controlledOpen : internalOpen
-  const setOpen = isControlled ? setControlledOpen! : setInternalOpen
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? setControlledOpen! : setInternalOpen;
 
   const [formData, setFormData] = React.useState<EventFormData>({
     title: "",
     description: "",
     start: "09:00",
     end: "10:00",
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split("T")[0],
     type: "TASK",
     energyCost: 3,
     importance: 3,
@@ -111,21 +120,37 @@ export function EventDialog({
     notes: "",
     isRecurring: false,
     recurrenceRule: "",
-  })
+  });
 
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date())
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
+    new Date(),
+  );
 
   React.useEffect(() => {
     if (event) {
-      setFormData(event)
-      setSelectedDate(new Date(event.date))
+      setFormData({
+        title: event.title ?? "",
+        description: event.description ?? "",
+        start: event.start ?? "09:00",
+        end: event.end ?? "10:00",
+        date: event.date ?? new Date().toISOString().split("T")[0],
+        type: event.type ?? "TASK",
+        energyCost: event.energyCost ?? 3,
+        importance: event.importance ?? 3,
+        flexibility: event.flexibility ?? 3,
+        causedById: event.causedById ?? "",
+        notes: event.notes ?? "",
+        isRecurring: event.isRecurring ?? false,
+        recurrenceRule: event.recurrenceRule ?? "",
+      });
+      setSelectedDate(new Date(event.date ?? new Date()));
     } else if (!open) {
       setFormData({
         title: "",
         description: "",
         start: "09:00",
         end: "10:00",
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
         type: "TASK",
         energyCost: 3,
         importance: 3,
@@ -134,31 +159,32 @@ export function EventDialog({
         notes: "",
         isRecurring: false,
         recurrenceRule: "",
-      })
-      setSelectedDate(new Date())
+      });
+      setSelectedDate(new Date());
     }
-  }, [event, open])
+  }, [event, open]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      setSelectedDate(date)
-      updateField("date", format(date, "yyyy-MM-dd"))
+      setSelectedDate(date);
+      updateField("date", format(date, "yyyy-MM-dd"));
     }
-  }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (event && onUpdate) {
-      onUpdate(formData)
+    e.preventDefault();
+    // Check if this is an edit (has id) or create (no id)
+    if (event?.id && onUpdate) {
+      onUpdate(formData);
     } else {
-      onCreate(formData)
+      onCreate(formData);
     }
-    setOpen(false)
-  }
+    setOpen(false);
+  };
 
   const updateField = (field: keyof EventFormData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -166,19 +192,25 @@ export function EventDialog({
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{event ? "Edit Event" : "Create Event"}</DialogTitle>
+            <DialogTitle>
+              {event?.id ? "Edit Event" : "Create Event"}
+            </DialogTitle>
             <DialogDescription>
-              {event ? "Modify event details." : "Add a new event with energy and causality tracking."}
+              {event?.id
+                ? "Modify event details."
+                : "Add a new event with energy and causality tracking."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             {/* Title */}
             <div className="space-y-2">
-              <label htmlFor="title" className="text-sm font-medium">Title</label>
+              <label htmlFor="title" className="text-sm font-medium">
+                Title
+              </label>
               <Input
                 id="title"
-                value={formData.title}
+                value={formData.title || ""}
                 onChange={(e) => updateField("title", e.target.value)}
                 placeholder="Event title"
                 required
@@ -196,11 +228,13 @@ export function EventDialog({
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground"
+                        !selectedDate && "text-muted-foreground",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "MMM d") : "Pick date"}
+                      {selectedDate
+                        ? format(selectedDate, "MMM d")
+                        : "Pick date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -217,12 +251,15 @@ export function EventDialog({
               {/* Start Time */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Start</label>
-                <Select value={formData.start} onValueChange={(v) => updateField("start", v)}>
+                <Select
+                  value={formData.start || "09:00"}
+                  onValueChange={(v) => updateField("start", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Start" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
-                    {TIME_OPTIONS.map(opt => (
+                    {TIME_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>
@@ -234,12 +271,15 @@ export function EventDialog({
               {/* End Time */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">End</label>
-                <Select value={formData.end} onValueChange={(v) => updateField("end", v)}>
+                <Select
+                  value={formData.end || "10:00"}
+                  onValueChange={(v) => updateField("end", v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="End" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
-                    {TIME_OPTIONS.map(opt => (
+                    {TIME_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>
@@ -253,7 +293,7 @@ export function EventDialog({
             <div className="space-y-2">
               <label className="text-sm font-medium">Type</label>
               <div className="flex flex-wrap gap-2">
-                {EVENT_TYPES.map(type => (
+                {EVENT_TYPES.map((type) => (
                   <button
                     key={type.value}
                     type="button"
@@ -263,7 +303,7 @@ export function EventDialog({
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
                       formData.type === type.value
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background border-border hover:bg-muted"
+                        : "bg-background border-border hover:bg-muted",
                     )}
                   >
                     {type.label}
@@ -279,7 +319,7 @@ export function EventDialog({
                 Energy Cost
               </label>
               <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map(level => (
+                {[1, 2, 3, 4, 5].map((level) => (
                   <button
                     key={level}
                     type="button"
@@ -289,7 +329,7 @@ export function EventDialog({
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
                       formData.energyCost === level
                         ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted"
+                        : "bg-background hover:bg-muted",
                     )}
                   >
                     {level === 1 ? "Low" : level === 5 ? "High" : level}
@@ -308,7 +348,7 @@ export function EventDialog({
                 Importance
               </label>
               <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map(level => (
+                {[1, 2, 3, 4, 5].map((level) => (
                   <button
                     key={level}
                     type="button"
@@ -318,7 +358,7 @@ export function EventDialog({
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
                       formData.importance === level
                         ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted"
+                        : "bg-background hover:bg-muted",
                     )}
                   >
                     {level === 1 ? "Low" : level === 5 ? "Critical" : level}
@@ -334,7 +374,7 @@ export function EventDialog({
                 Flexibility
               </label>
               <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map(level => (
+                {[1, 2, 3, 4, 5].map((level) => (
                   <button
                     key={level}
                     type="button"
@@ -344,7 +384,7 @@ export function EventDialog({
                       "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]",
                       formData.flexibility === level
                         ? "bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted"
+                        : "bg-background hover:bg-muted",
                     )}
                   >
                     {level === 1 ? "Fixed" : level === 5 ? "Flex" : level}
@@ -366,9 +406,17 @@ export function EventDialog({
                 value={formData.recurrenceRule || "none"}
                 onValueChange={(v) => {
                   if (v === "none") {
-                    setFormData(prev => ({ ...prev, isRecurring: false, recurrenceRule: "" }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      isRecurring: false,
+                      recurrenceRule: "",
+                    }));
                   } else {
-                    setFormData(prev => ({ ...prev, isRecurring: true, recurrenceRule: v }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      isRecurring: true,
+                      recurrenceRule: v,
+                    }));
                   }
                 }}
               >
@@ -376,7 +424,7 @@ export function EventDialog({
                   <SelectValue placeholder="Does not repeat" />
                 </SelectTrigger>
                 <SelectContent>
-                  {RECURRENCE_OPTIONS.map(opt => (
+                  {RECURRENCE_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -399,20 +447,23 @@ export function EventDialog({
                 </label>
                 <Select
                   value={formData.causedById || "none"}
-                  onValueChange={(v) => updateField("causedById", v === "none" ? "" : v)}
+                  onValueChange={(v) =>
+                    updateField("causedById", v === "none" ? "" : v)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="No causal link" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No causal link</SelectItem>
-                    {existingEvents.map(evt => (
+                    {existingEvents.map((evt) =>
                       // @ts-ignore
-                      (event?.id && evt.id === event.id) ? null :
+                      event?.id && evt.id === event.id ? null : (
                         <SelectItem key={evt.id} value={evt.id}>
                           {evt.title}
                         </SelectItem>
-                    ))}
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
@@ -434,14 +485,14 @@ export function EventDialog({
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            {event && onDelete && (
+            {event?.id && onDelete && (
               <Button
                 type="button"
                 variant="destructive"
                 onClick={() => {
                   if (confirm("Delete this event?")) {
-                    onDelete()
-                    setOpen(false)
+                    onDelete();
+                    setOpen(false);
                   }
                 }}
                 className="mr-auto"
@@ -449,10 +500,12 @@ export function EventDialog({
                 Delete
               </Button>
             )}
-            <Button type="submit">{event ? "Save Changes" : "Create Event"}</Button>
+            <Button type="submit">
+              {event?.id ? "Save Changes" : "Create Event"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

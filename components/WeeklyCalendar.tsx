@@ -4,20 +4,19 @@ import * as React from "react"
 import { addDays, format, startOfWeek, eachDayOfInterval, endOfWeek, isSameDay } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Sparkles, Sun, Moon, Settings } from "lucide-react"
-import { EventDialog } from "@/components/EventDialog"
-import { InsightsPanel } from "@/components/InsightsPanel"
-import { TimezoneOnboarding } from "@/components/TimezoneOnboarding"
-import { OnboardingTour } from "@/components/OnboardingTour"
-import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp"
-import { QuickAddInput } from "@/components/QuickAddInput"
-import { UserMenu } from "@/components/UserMenu"
+import { ChevronLeft, ChevronRight, Zap, Plus, Sun, Moon } from "lucide-react"
+import { AnimateIcon } from "@/components/animate-ui/icons/icon"
+import { PanelLeftClose } from "@/components/animate-ui/icons/panel-left-close"
+import { PanelRightClose } from "@/components/animate-ui/icons/panel-right-close"
+import { Settings as AnimatedSettings } from "@/components/animate-ui/icons/settings"
+import { Sparkles } from "@/components/animate-ui/icons/sparkles"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import { useUndoableAction } from "@/hooks/useUndoableAction"
 import { useEventNotifications } from "@/hooks/useEventNotifications"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 
 import {
   DndContext,
@@ -33,7 +32,36 @@ import {
   PointerSensor,
 } from "@dnd-kit/core"
 
-// Event type matching API response
+const EventDialog = dynamic(() => import("@/components/EventDialog").then(mod => ({ default: mod.EventDialog })), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">Loading...</div>,
+})
+
+const InsightsPanel = dynamic(() => import("@/components/InsightsPanel").then(mod => ({ default: mod.InsightsPanel })), {
+  ssr: false,
+  loading: () => <div className="h-full bg-muted/20 p-4 animate-pulse" />,
+})
+
+const TimezoneOnboarding = dynamic(() => import("@/components/TimezoneOnboarding").then(mod => ({ default: mod.TimezoneOnboarding })), {
+  ssr: false,
+})
+
+const OnboardingTour = dynamic(() => import("@/components/OnboardingTour").then(mod => ({ default: mod.OnboardingTour })), {
+  ssr: false,
+})
+
+const KeyboardShortcutsHelp = dynamic(() => import("@/components/KeyboardShortcutsHelp").then(mod => ({ default: mod.KeyboardShortcutsHelp })), {
+  ssr: false,
+})
+
+const QuickAddInput = dynamic(() => import("@/components/QuickAddInput").then(mod => ({ default: mod.QuickAddInput })), {
+  ssr: false,
+})
+
+const UserMenu = dynamic(() => import("@/components/UserMenu").then(mod => ({ default: mod.UserMenu })), {
+  ssr: false,
+})
+
 export type Event = {
   id: string
   title: string
@@ -42,11 +70,11 @@ export type Event = {
   end: string | Date
   allDay: boolean
   location?: string | null
-  source: "MANUAL"
+  source: string
   externalId?: string | null
   type: string
   energyCost: number
-  cognitiveLoad: number
+  cognitiveLoad?: number
   importance: number
   flexibility: number
   contextTag?: string | null
@@ -61,8 +89,7 @@ type InsightsData = {
   summary: { totalEnergy: number; burnoutRisk: boolean; heavyDays: number; eventCount: number }
 }
 
-// --- Event Card Component (used for both draggable and overlay) ---
-function EventCard({ event, getEventColor, isDragging = false, isOverlay = false }: {
+const EventCard = React.memo(function EventCard({ event, getEventColor, isDragging = false, isOverlay = false }: {
   event: Event,
   getEventColor: (t: string) => string,
   isDragging?: boolean,
@@ -75,7 +102,7 @@ function EventCard({ event, getEventColor, isDragging = false, isOverlay = false
   return (
     <div
       className={cn(
-        "text-white text-xs p-2 rounded-lg transition-all duration-200",
+        "h-full text-white text-xs p-2 rounded-lg transition-all duration-200 overflow-hidden",
         "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_2px_4px_0_rgba(0,0,0,0.2)]",
         getEventColor(event.type),
         !isOverlay && "cursor-grab active:cursor-grabbing hover:scale-[1.02] hover:shadow-lg",
@@ -91,10 +118,9 @@ function EventCard({ event, getEventColor, isDragging = false, isOverlay = false
       )}
     </div>
   )
-}
+})
 
-// --- DnD Components ---
-function DraggableEvent({ event, onClick, getEventColor, isDragging }: {
+const DraggableEvent = React.memo(function DraggableEvent({ event, onClick, getEventColor, isDragging }: {
   event: Event,
   onClick: () => void,
   getEventColor: (t: string) => string,
@@ -135,13 +161,14 @@ function DraggableEvent({ event, onClick, getEventColor, isDragging }: {
       <EventCard event={event} getEventColor={getEventColor} isDragging={isDragging} />
     </div>
   )
-}
+})
 
-function DroppableDay({ day, children, className, isOver }: {
+const DroppableDay = React.memo(function DroppableDay({ day, children, className, isOver, style }: {
   day: Date,
   children: React.ReactNode,
   className?: string,
-  isOver?: boolean
+  isOver?: boolean,
+  style?: React.CSSProperties
 }) {
   const { setNodeRef, isOver: dropIsOver } = useDroppable({
     id: format(day, "yyyy-MM-dd"),
@@ -155,14 +182,14 @@ function DroppableDay({ day, children, className, isOver }: {
         "transition-colors duration-200",
         (isOver || dropIsOver) && "bg-primary/5"
       )}
+      style={style}
     >
       {children}
     </div>
   )
-}
+})
 
-// --- Clickable Time Slot ---
-function TimeSlot({ hour, onClick }: { hour: number, onClick: () => void }) {
+const TimeSlot = React.memo(function TimeSlot({ hour, onClick }: { hour: number, onClick: () => void }) {
   return (
     <div
       className="h-14 border-b border-border/30 hover:bg-primary/5 transition-colors duration-150 cursor-pointer group"
@@ -173,14 +200,25 @@ function TimeSlot({ hour, onClick }: { hour: number, onClick: () => void }) {
       </div>
     </div>
   )
+})
+
+interface WeeklyCalendarProps {
+  initialEvents?: Event[]
+  initialInsights?: InsightsData | null
+  initialWeekStart?: string
 }
 
-
-export function WeeklyCalendar() {
-  const [currentDate, setCurrentDate] = React.useState(new Date())
-  const [events, setEvents] = React.useState<Event[]>([])
-  const [insights, setInsights] = React.useState<InsightsData | null>(null)
-  const [loading, setLoading] = React.useState(true)
+export function WeeklyCalendar({ 
+  initialEvents = [], 
+  initialInsights = null,
+  initialWeekStart 
+}: WeeklyCalendarProps) {
+  const [currentDate, setCurrentDate] = React.useState(() => 
+    initialWeekStart ? new Date(initialWeekStart) : new Date()
+  )
+  const [events, setEvents] = React.useState<Event[]>(initialEvents)
+  const [insights, setInsights] = React.useState<InsightsData | null>(initialInsights)
+  const [loading, setLoading] = React.useState(!initialEvents.length)
   const [showInsights, setShowInsights] = React.useState(false)
   const [editingEvent, setEditingEvent] = React.useState<any>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
@@ -191,11 +229,10 @@ export function WeeklyCalendar() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
-  // Improved sensors for smoother drag experience
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Slightly lower for more responsive feel
+        distance: 8,
       },
     }),
     useSensor(MouseSensor, {
@@ -215,10 +252,10 @@ export function WeeklyCalendar() {
     setMounted(true)
   }, [])
 
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
-  const days = eachDayOfInterval({ start: weekStart, end: weekEnd })
-  const hours = Array.from({ length: 24 }, (_, i) => i)
+  const weekStart = React.useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate])
+  const weekEnd = React.useMemo(() => endOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate])
+  const days = React.useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd])
+  const hours = React.useMemo(() => Array.from({ length: 24 }, (_, i) => i), [])
 
   const fetchEvents = React.useCallback(async () => {
     try {
@@ -227,7 +264,6 @@ export function WeeklyCalendar() {
         setEvents(await res.json())
       }
     } catch (error) {
-
     }
   }, [weekStart.toISOString(), weekEnd.toISOString()])
 
@@ -242,28 +278,39 @@ export function WeeklyCalendar() {
     }
   }, [weekStart.toISOString()])
 
+  const [hasInitialData] = React.useState(() => initialEvents.length > 0)
+
   React.useEffect(() => {
+    if (hasInitialData) {
+      setLoading(false)
+      return
+    }
     const load = async () => {
       setLoading(true)
       await Promise.all([fetchEvents(), fetchInsights()])
       setLoading(false)
     }
     load()
-  }, [fetchEvents, fetchInsights])
+  }, [fetchEvents, fetchInsights, hasInitialData])
+
+  React.useEffect(() => {
+    if (!hasInitialData) return
+    const load = async () => {
+      await Promise.all([fetchEvents(), fetchInsights()])
+    }
+    load()
+  }, [weekStart.toISOString(), hasInitialData, fetchEvents, fetchInsights])
 
   const nextWeek = () => setCurrentDate(addDays(currentDate, 7))
   const prevWeek = () => setCurrentDate(addDays(currentDate, -7))
   const today = () => setCurrentDate(new Date())
 
-  // Refresh function for undoable actions
   const refreshAll = React.useCallback(async () => {
     await Promise.all([fetchEvents(), fetchInsights()])
   }, [fetchEvents, fetchInsights])
 
-  // Undoable actions hook
   const { deleteWithUndo, moveWithUndo } = useUndoableAction({ onRefresh: refreshAll })
 
-  // Keyboard shortcuts
   useKeyboardShortcuts({
     onNewEvent: () => {
       setEditingEvent(null)
@@ -280,10 +327,9 @@ export function WeeklyCalendar() {
         setNewEventDefaults(null)
       }
     },
-    enabled: !activeId, // Disable during drag
+    enabled: !activeId,
   })
 
-  // Event notifications
   useEventNotifications({
     events,
     enabled: true,
@@ -336,7 +382,6 @@ export function WeeklyCalendar() {
       const startDate = new Date(`${formData.date}T${formData.start}`)
       let endDate = new Date(`${formData.date}T${formData.end}`)
 
-      // Handle overnight events
       if (endDate < startDate) {
         endDate.setDate(endDate.getDate() + 1)
       }
@@ -345,9 +390,17 @@ export function WeeklyCalendar() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
+          title: formData.title,
+          description: formData.description || null,
           start: startDate.toISOString(),
           end: endDate.toISOString(),
+          allDay: formData.allDay || false,
+          type: formData.type || "TASK",
+          energyCost: formData.energyCost || 3,
+          importance: formData.importance || 3,
+          flexibility: formData.flexibility || 3,
+          notes: formData.notes || null,
+          causedById: formData.causedById || null,
         }),
       })
       if (res.ok) {
@@ -356,9 +409,12 @@ export function WeeklyCalendar() {
         setNewEventDefaults(null)
         await fetchEvents()
         await fetchInsights()
+      } else {
+        const errorData = await res.json().catch(() => ({}))
+        toast.error(errorData.error || "Failed to create event")
       }
-    } catch (error) {
-
+    } catch {
+      toast.error("Failed to create event")
     }
   }
 
@@ -368,7 +424,6 @@ export function WeeklyCalendar() {
       const startDate = new Date(`${formData.date}T${formData.start}`)
       let endDate = new Date(`${formData.date}T${formData.end}`)
 
-      // Handle overnight events (if end time is before start time, it means next day)
       if (endDate < startDate) {
         endDate.setDate(endDate.getDate() + 1)
       }
@@ -404,11 +459,10 @@ export function WeeklyCalendar() {
     setDialogOpen(false)
     setEditingEvent(null)
 
-    // Use undoable delete
     await deleteWithUndo(eventToDelete)
   }
 
-  const getEventColor = (type: string) => {
+  const getEventColor = React.useCallback((type: string) => {
     const colors: Record<string, string> = {
       MEETING: "bg-blue-600",
       TASK: "bg-indigo-500",
@@ -418,16 +472,15 @@ export function WeeklyCalendar() {
       PERSONAL: "bg-pink-500",
     }
     return colors[type] || "bg-indigo-500"
-  }
+  }, [])
 
-  const getDayStatus = (day: Date) => {
+  const getDayStatus = React.useCallback((day: Date) => {
     const dayLoad = insights?.dailyLoads.find(d =>
       new Date(d.date).toDateString() === day.toDateString()
     )
     return dayLoad?.status || "light"
-  }
+  }, [insights?.dailyLoads])
 
-  // --- Drag Handlers ---
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
   }
@@ -444,10 +497,9 @@ export function WeeklyCalendar() {
 
     const targetDateStr = over.id as string
 
-    // Calculate new time - 3.5rem = 56px per hour
     const pixelsPerHour = 56
     const hoursMoved = delta.y / pixelsPerHour
-    const snappedHoursMoved = Math.round(hoursMoved * 4) / 4 // Snap to 15 mins
+    const snappedHoursMoved = Math.round(hoursMoved * 4) / 4
 
     const oldStart = new Date(dbEvent.start)
     const oldEnd = new Date(dbEvent.end)
@@ -465,14 +517,12 @@ export function WeeklyCalendar() {
 
     const newEnd = new Date(newStart.getTime() + durationMs)
 
-    // Optimistic update for smooth UX
     setEvents(prev => prev.map(e =>
       e.id === eventId
         ? { ...e, start: newStart.toISOString(), end: newEnd.toISOString() }
         : e
     ))
 
-    // Use undoable move
     await moveWithUndo(dbEvent, newStart, newEnd, oldStart, oldEnd)
     await fetchInsights()
   }
@@ -481,7 +531,6 @@ export function WeeklyCalendar() {
     setActiveId(null)
   }
 
-  // Click on time slot to create event
   const handleTimeSlotClick = (day: Date, hour: number) => {
     const dateStr = format(day, "yyyy-MM-dd")
     const startTime = `${hour.toString().padStart(2, '0')}:00`
@@ -490,7 +539,6 @@ export function WeeklyCalendar() {
     setDialogOpen(true)
   }
 
-  // Get the active event for the drag overlay
   const activeEvent = activeId ? events.find(e => e.id === activeId) : null
 
   return (
@@ -517,20 +565,28 @@ export function WeeklyCalendar() {
             )}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
-            <Button variant="outline" size="sm" onClick={handleOptimize} disabled={optimizing} className="hidden sm:flex">
-              <Sparkles className="h-4 w-4 mr-1.5" />
-              {optimizing ? "Optimizing..." : "AI Optimize"}
-            </Button>
-            <Button variant="outline" size="icon" onClick={handleOptimize} disabled={optimizing} className="sm:hidden">
-              <Sparkles className="h-4 w-4" />
-            </Button>
-            <Button variant={showInsights ? "secondary" : "outline"} size="sm" onClick={() => setShowInsights(!showInsights)} className="hidden sm:flex">
-              {showInsights ? <PanelRightClose className="h-4 w-4 mr-1.5" /> : <PanelRightOpen className="h-4 w-4 mr-1.5" />}
-              Insights
-            </Button>
-            <Button variant={showInsights ? "secondary" : "outline"} size="icon" onClick={() => setShowInsights(!showInsights)} className="sm:hidden">
-              {showInsights ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-            </Button>
+            <AnimateIcon animateOnHover asChild>
+              <Button variant="outline" size="sm" onClick={handleOptimize} disabled={optimizing} className="hidden sm:flex">
+                <Sparkles size={16} className="mr-1.5" />
+                {optimizing ? "Optimizing..." : "AI Optimize"}
+              </Button>
+            </AnimateIcon>
+            <AnimateIcon animateOnHover asChild>
+              <Button variant="outline" size="icon" onClick={handleOptimize} disabled={optimizing} className="sm:hidden">
+                <Sparkles size={16} />
+              </Button>
+            </AnimateIcon>
+            <AnimateIcon animateOnHover asChild>
+              <Button variant={showInsights ? "secondary" : "outline"} size="sm" onClick={() => setShowInsights(!showInsights)} className="hidden sm:flex">
+                {showInsights ? <PanelRightClose size={16} className="mr-1.5" /> : <PanelLeftClose size={16} className="mr-1.5" />}
+                Insights
+              </Button>
+            </AnimateIcon>
+            <AnimateIcon animateOnHover asChild>
+              <Button variant={showInsights ? "secondary" : "outline"} size="icon" onClick={() => setShowInsights(!showInsights)} className="sm:hidden">
+                {showInsights ? <PanelRightClose size={16} /> : <PanelLeftClose size={16} />}
+              </Button>
+            </AnimateIcon>
             <QuickAddInput
               onCreateEvent={async (parsedEvent) => {
                 try {
@@ -553,6 +609,9 @@ export function WeeklyCalendar() {
                     toast.success("Event created via Quick Add")
                     await fetchEvents()
                     await fetchInsights()
+                  } else {
+                    const errorData = await res.json().catch(() => ({}))
+                    toast.error(errorData.error || "Failed to create event")
                   }
                 } catch (error) {
                   toast.error("Failed to create event")
@@ -570,9 +629,11 @@ export function WeeklyCalendar() {
             </Button>
             <KeyboardShortcutsHelp />
             <Link href="/settings">
-              <Button variant="ghost" size="icon" title="Settings">
-                <Settings className="h-4 w-4" />
-              </Button>
+              <AnimateIcon animateOnHover asChild>
+                <Button variant="ghost" size="icon" title="Settings">
+                  <AnimatedSettings size={16} />
+                </Button>
+              </AnimateIcon>
             </Link>
             <UserMenu />
           </div>
@@ -598,17 +659,18 @@ export function WeeklyCalendar() {
             </div>
 
             {/* Time Grid */}
-            <div className="flex-1 flex overflow-auto">
-              <div className="w-16 flex-shrink-0 border-r border-border">
-                {hours.map((hour) => (
-                  <div key={hour} className="h-14 text-xs text-muted-foreground text-right pr-2 pt-1">
-                    {format(new Date().setHours(hour, 0), "HH:mm")}
-                  </div>
-                ))}
-              </div>
-              <div className="flex-1 grid grid-cols-7">
+            <div className="flex-1 overflow-auto">
+              <div className="flex" style={{ minHeight: `${24 * 3.5}rem` }}>
+                <div className="w-16 flex-shrink-0 border-r border-border">
+                  {hours.map((hour) => (
+                    <div key={hour} className="h-14 text-xs text-muted-foreground text-right pr-2 flex items-center justify-end">
+                      {format(new Date().setHours(hour, 0), "HH:mm")}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex-1 grid grid-cols-7">
                 {days.map((day) => (
-                  <DroppableDay key={day.toString()} day={day} className="border-r last:border-r-0 border-border relative">
+                  <DroppableDay key={day.toString()} day={day} className="border-r last:border-r-0 border-border relative" style={{ minHeight: `${24 * 3.5}rem` }}>
                     {hours.map((hour) => (
                       <TimeSlot
                         key={hour}
@@ -633,6 +695,7 @@ export function WeeklyCalendar() {
                       ))}
                   </DroppableDay>
                 ))}
+                </div>
               </div>
             </div>
           </div>

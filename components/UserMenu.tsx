@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import { signOut, useSession } from "next-auth/react"
-import { LogOut, User, Settings } from "lucide-react"
+import { LogOut, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Settings as AnimatedSettings } from "@/components/animate-ui/icons/settings"
 import {
     Popover,
     PopoverContent,
@@ -78,7 +79,7 @@ export function UserMenu() {
                             variant="ghost"
                             className="w-full justify-start gap-2 h-9"
                         >
-                            <Settings className="h-4 w-4" />
+                            <AnimatedSettings animateOnHover size={16} />
                             Settings
                         </Button>
                     </Link>

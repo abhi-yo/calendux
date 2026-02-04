@@ -226,12 +226,14 @@ export function PreferencesPanel({ onSave }: PreferencesPanelProps) {
                             <button
                                 onClick={() => updatePreference("enableNotifications", !preferences.enableNotifications)}
                                 className={cn(
-                                    "relative w-11 h-6 rounded-full transition-colors",
-                                    preferences.enableNotifications ? "bg-primary" : "bg-muted"
+                                    "relative w-11 h-6 rounded-full transition-colors border",
+                                    preferences.enableNotifications 
+                                        ? "bg-emerald-500 border-emerald-600" 
+                                        : "bg-neutral-800 border-neutral-700"
                                 )}
                             >
                                 <span className={cn(
-                                    "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
+                                    "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform",
                                     preferences.enableNotifications && "translate-x-5"
                                 )} />
                             </button>
@@ -277,14 +279,16 @@ export function PreferencesPanel({ onSave }: PreferencesPanelProps) {
                     <button
                         onClick={() => updatePreference("useAI", !preferences.useAI)}
                         className={cn(
-                            "relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                            preferences.useAI ? "bg-primary" : "bg-muted"
+                            "relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            preferences.useAI 
+                                ? "bg-emerald-500 border-emerald-600" 
+                                : "bg-neutral-800 border-neutral-700"
                         )}
                         role="switch"
                         aria-checked={preferences.useAI}
                     >
                         <span className={cn(
-                            "absolute top-1 left-1 w-4 h-4 rounded-full bg-background shadow-sm transition-transform duration-200",
+                            "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200",
                             preferences.useAI && "translate-x-5"
                         )} />
                     </button>
@@ -301,8 +305,8 @@ export function PreferencesPanel({ onSave }: PreferencesPanelProps) {
                                 onChange={(e) => updatePreference("aiProvider", e.target.value)}
                                 className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <option value="openai">OpenAI (GPT-5.2)</option>
-                                <option value="google">Google (Gemini 3 Flash)</option>
+                                <option value="openai">OpenAI (GPT-4o)</option>
+                                <option value="google">Google (Gemini 2.0 Flash)</option>
                             </select>
                         </div>
 

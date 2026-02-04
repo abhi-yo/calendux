@@ -12,7 +12,7 @@ interface UndoableEvent {
     allDay: boolean
     type: string
     energyCost: number
-    cognitiveLoad: number
+    cognitiveLoad?: number
     importance: number
     flexibility: number
     contextTag?: string | null
