@@ -378,6 +378,17 @@ const PixelBlast = ({
     const prevConfigRef = useRef<{ antialias: boolean; liquid: boolean; noiseAmount: number } | null>(null);
 
     useEffect(() => {
+        const el = containerRef.current;
+        if (!el || !autoPauseOffscreen) return;
+        const io = new IntersectionObserver(
+            ([entry]) => { visibilityRef.current.visible = entry.isIntersecting; },
+            { threshold: 0 }
+        );
+        io.observe(el);
+        return () => io.disconnect();
+    }, [autoPauseOffscreen]);
+
+    useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
         speedRef.current = speed;
