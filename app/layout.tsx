@@ -122,6 +122,7 @@ export default function RootLayout({
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
+            storageKey="calendux-theme"
           >
             {children}
             <Toaster richColors position="bottom-right" />

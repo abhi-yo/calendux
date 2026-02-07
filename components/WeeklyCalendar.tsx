@@ -4,13 +4,12 @@ import * as React from "react"
 import { addDays, format, startOfWeek, eachDayOfInterval, endOfWeek, isSameDay } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Zap, Plus, Sun, Moon } from "lucide-react"
+import { ChevronLeft, ChevronRight, Zap, Plus } from "lucide-react"
 import { AnimateIcon } from "@/components/animate-ui/icons/icon"
 import { PanelLeftClose } from "@/components/animate-ui/icons/panel-left-close"
 import { PanelRightClose } from "@/components/animate-ui/icons/panel-right-close"
 import { Settings as AnimatedSettings } from "@/components/animate-ui/icons/settings"
 import { Sparkles } from "@/components/animate-ui/icons/sparkles"
-import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import { useUndoableAction } from "@/hooks/useUndoableAction"
@@ -226,9 +225,6 @@ export function WeeklyCalendar({
   const [activeId, setActiveId] = React.useState<string | null>(null)
   const [newEventDefaults, setNewEventDefaults] = React.useState<{ date: string; start: string } | null>(null)
 
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = React.useState(false)
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -247,10 +243,6 @@ export function WeeklyCalendar({
       },
     })
   )
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const weekStart = React.useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate])
   const weekEnd = React.useMemo(() => endOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate])
@@ -623,9 +615,6 @@ export function WeeklyCalendar({
             </Button>
             <Button size="icon" onClick={() => { setEditingEvent(null); setNewEventDefaults(null); setDialogOpen(true); }} className="sm:hidden">
               <Plus className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-              {mounted ? (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />) : <Sun className="h-4 w-4" />}
             </Button>
             <KeyboardShortcutsHelp />
             <Link href="/settings">
