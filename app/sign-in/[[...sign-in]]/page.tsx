@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Calendar, Sparkles } from "lucide-react"
@@ -442,12 +443,12 @@ export default function SignInPage() {
         </div>
 
         <div className="relative z-20 flex items-center gap-8 text-sm text-primary-foreground/60">
-          <a href="#" className="hover:text-primary-foreground transition-colors">
+          <Link href="/privacy" className="hover:text-primary-foreground transition-colors">
             Privacy Policy
-          </a>
-          <a href="#" className="hover:text-primary-foreground transition-colors">
+          </Link>
+          <Link href="/terms" className="hover:text-primary-foreground transition-colors">
             Terms of Service
-          </a>
+          </Link>
         </div>
 
         {/* Decorative elements */}
@@ -505,13 +506,13 @@ export default function SignInPage() {
           {/* Terms */}
           <p className="mt-10 text-xs text-center text-muted-foreground/70 max-w-xs mx-auto leading-relaxed">
             By continuing, you agree to our{" "}
-            <span className="underline underline-offset-2 hover:text-foreground cursor-pointer transition-colors">
+            <Link href="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
               Terms of Service
-            </span>{" "}
+            </Link>{" "}
             and{" "}
-            <span className="underline underline-offset-2 hover:text-foreground cursor-pointer transition-colors">
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
               Privacy Policy
-            </span>
+            </Link>
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import Link from "next/link"
 import { motion } from "framer-motion"
 import {
     CalendarBlank,
@@ -10,7 +11,6 @@ import {
     ArrowRight
 } from "@phosphor-icons/react"
 
-// Dynamic import to avoid SSR issues with Three.js
 const PixelBlast = dynamic(() => import("@/components/PixelBlast"), {
     ssr: false,
     loading: () => <div className="absolute inset-0 bg-[#08080a]" />
@@ -346,10 +346,12 @@ export function LandingPage() {
                         © 2026 Calendux
                     </span>
                     <div className="flex items-center gap-6">
-                        <a href="/sign-in" className="text-xs text-white/20 hover:text-white/50 transition-colors"
-                            style={{ fontFamily: 'var(--font-inter)' }}>Sign In</a>
-                        <a href="/sign-in" className="text-xs text-white/20 hover:text-white/50 transition-colors"
-                            style={{ fontFamily: 'var(--font-inter)' }}>Sign Up</a>
+                        <Link href="/privacy" className="text-xs text-white/20 hover:text-white/50 transition-colors" style={{ fontFamily: 'var(--font-inter)' }}>
+                            Privacy Policy
+                        </Link>
+                        <Link href="/terms" className="text-xs text-white/20 hover:text-white/50 transition-colors" style={{ fontFamily: 'var(--font-inter)' }}>
+                            Terms of Service
+                        </Link>
                     </div>
                 </footer>
             </main>
